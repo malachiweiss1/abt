@@ -293,23 +293,17 @@ export default function PlayerScreen({ params }: PageProps) {
             {(currentQuestion.options as string[]).map((option) => (
               <button
                 key={option}
-                onClick={() => setSelectedAnswer(option)}
+                onClick={() => { setSelectedAnswer(option); handleSubmit(option); }}
+                disabled={submitting}
                 className={`w-full py-5 rounded-2xl text-xl font-bold transition-all ${
                   selectedAnswer === option
                     ? 'bg-pink-500 text-white scale-105 shadow-lg'
                     : 'bg-white/20 text-white hover:bg-white/30'
-                } cursor-pointer`}
+                } disabled:opacity-60 cursor-pointer`}
               >
-                {option}
+                {submitting && selectedAnswer === option ? 'שולח...' : option}
               </button>
             ))}
-            <button
-              onClick={() => handleSubmit()}
-              disabled={!selectedAnswer || submitting}
-              className="w-full mt-4 bg-green-500 hover:bg-green-600 disabled:opacity-50 text-white font-bold py-4 rounded-2xl text-xl transition-colors"
-            >
-              {submitting ? 'שולח...' : 'שלח תשובה'}
-            </button>
             {error && <p className="text-red-300 text-center">{error}</p>}
           </div>
         )}
