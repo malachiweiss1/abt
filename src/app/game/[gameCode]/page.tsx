@@ -172,10 +172,19 @@ export default function GameScreen({ params }: PageProps) {
             <>
               <h2 className="text-4xl font-bold text-white text-center">💌 ברכות לאביה</h2>
               <GreetingPlayer
-                greetings={answers.map(a => ({
-                  playerName: players.find(p => p.id === a.player_id)?.display_name ?? '?',
-                  text: a.answer_value,
-                }))}
+                greetings={answers.map(a => {
+                  let text = a.answer_value;
+                  let voice = 'woman';
+                  try {
+                    const parsed = JSON.parse(a.answer_value);
+                    if (parsed?.text) { text = parsed.text; voice = parsed.voice || 'woman'; }
+                  } catch { /* plain text greeting */ }
+                  return {
+                    playerName: players.find(p => p.id === a.player_id)?.display_name ?? '?',
+                    text,
+                    voice,
+                  };
+                })}
               />
             </>
           ) : (

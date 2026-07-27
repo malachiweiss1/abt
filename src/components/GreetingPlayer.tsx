@@ -1,139 +1,116 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useRef, useState } from 'react';
 
 interface Greeting {
   playerName: string;
   text: string;
+  voice?: string;
 }
 
 interface GreetingPlayerProps {
   greetings: Greeting[];
 }
 
+const VOICE_META: Record<string, { emoji: string; label: string }> = {
+  woman:    { emoji: '👩', label: 'אישה' },
+  man:      { emoji: '👨', label: 'גבר' },
+  child:    { emoji: '👦', label: 'ילד' },
+  announcer:{ emoji: '📣', label: 'קריין' },
+};
+
+function ttsUrl(text: string, voice: string) {
+  return `/api/tts?text=${encodeURIComponent(text)}&voice=${encodeURIComponent(voice)}`;
+}
+
 export default function GreetingPlayer({ greetings }: GreetingPlayerProps) {
-  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
-  const [selectedVoiceName, setSelectedVoiceName] = useState('');
+  const audioRefs = useRef<(HTMLAudioElement | null)[]>([]);
   const [playingIndex, setPlayingIndex] = useState<number | null>(null);
-  const [supported, setSupported] = useState(true);
-
-  useEffect(() => {
-    if (typeof window === 'undefined' || !window.speechSynthesis) {
-      setSupported(false);
-      return;
-    }
-
-    const loadVoices = () => {
-      const all = window.speechSynthesis.getVoices();
-      // Prefer Hebrew voices; fall back to showing all
-      const he = all.filter(v => v.lang.startsWith('he'));
-      setVoices(he.length > 0 ? he : all);
-    };
-
-    loadVoices();
-    window.speechSynthesis.addEventListener('voiceschanged', loadVoices);
-    return () => window.speechSynthesis.removeEventListener('voiceschanged', loadVoices);
-  }, []);
-
-  const getVoice = () =>
-    voices.find(v => v.name === selectedVoiceName) ?? voices[0] ?? null;
-
-  const speakOne = (text: string, index: number): Promise<void> =>
-    new Promise((resolve) => {
-      window.speechSynthesis.cancel();
-      const utt = new SpeechSynthesisUtterance(text);
-      utt.lang = 'he-IL';
-      const voice = getVoice();
-      if (voice) utt.voice = voice;
-      utt.rate = 0.95;
-      utt.onstart = () => setPlayingIndex(index);
-      utt.onend = () => { setPlayingIndex(null); resolve(); };
-      utt.onerror = () => { setPlayingIndex(null); resolve(); };
-      window.speechSynthesis.speak(utt);
-    });
+  const [isPlayingAll, setIsPlayingAll] = useState(false);
+  const stopFlag = useRef(false);
 
   const playAll = async () => {
+    stopFlag.current = false;
+    setIsPlayingAll(true);
     for (let i = 0; i < greetings.length; i++) {
-      await speakOne(greetings[i].text, i);
-      // Short pause between greetings
-      await new Promise(r => setTimeout(r, 600));
+      if (stopFlag.current) break;
+      const audio = audioRefs.current[i];
+      if (!audio) continue;
+      audio.currentTime = 0;
+      setPlayingIndex(i);
+      await new Promise<void>((resolve) => {
+        const onEnd = () => { audio.removeEventListener('ended', onEnd); audio.removeEventListener('error', onEnd); resolve(); };
+        audio.addEventListener('ended', onEnd);
+        audio.addEventListener('error', onEnd);
+        audio.play().catch(resolve);
+      });
+      if (!stopFlag.current) await new Promise(r => setTimeout(r, 700));
     }
-  };
-
-  const stop = () => {
-    window.speechSynthesis.cancel();
     setPlayingIndex(null);
+    setIsPlayingAll(false);
   };
 
-  if (!supported) {
-    return (
-      <p className="text-yellow-300 text-center">
-        הדפדפן שלך אינו תומך בהשמעת טקסט. נסה בכרום.
-      </p>
-    );
+  const stopAll = () => {
+    stopFlag.current = true;
+    audioRefs.current.forEach(a => { if (a) { a.pause(); a.currentTime = 0; } });
+    setPlayingIndex(null);
+    setIsPlayingAll(false);
+  };
+
+  if (greetings.length === 0) {
+    return <p className="text-pink-200 text-center">אין ברכות עדיין...</p>;
   }
 
   return (
     <div className="space-y-4 w-full">
-      {/* Voice selector */}
-      {voices.length > 1 && (
-        <div className="flex flex-col gap-1">
-          <label className="text-pink-200 text-sm">בחר קול:</label>
-          <select
-            value={selectedVoiceName}
-            onChange={e => setSelectedVoiceName(e.target.value)}
-            className="bg-white/20 text-white rounded-xl p-2 border border-white/30 text-sm"
-          >
-            {voices.map(v => (
-              <option key={v.name} value={v.name} className="text-black bg-white">
-                {v.name} ({v.lang})
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
-
       {/* Controls */}
       <div className="flex gap-3">
         <button
-          onClick={playAll}
-          disabled={playingIndex !== null || greetings.length === 0}
-          className="flex-1 bg-green-500 hover:bg-green-600 disabled:opacity-50 text-white font-bold py-3 rounded-xl text-lg"
+          onClick={isPlayingAll ? stopAll : playAll}
+          className={`flex-1 font-bold py-3 rounded-xl text-lg transition-colors ${
+            isPlayingAll
+              ? 'bg-red-500 hover:bg-red-600 text-white'
+              : 'bg-green-500 hover:bg-green-600 text-white'
+          }`}
         >
-          ▶ השמע את כולם
-        </button>
-        <button
-          onClick={stop}
-          className="bg-red-500 hover:bg-red-600 text-white font-bold py-3 px-5 rounded-xl text-lg"
-        >
-          ■
+          {isPlayingAll ? '■ עצור' : '▶ השמע את כולם'}
         </button>
       </div>
 
       {/* Individual greetings */}
-      <div className="space-y-3 max-h-96 overflow-y-auto">
-        {greetings.map((g, i) => (
-          <div
-            key={i}
-            className={`rounded-2xl p-4 flex items-start gap-3 transition-all ${
-              playingIndex === i
-                ? 'bg-yellow-400/30 border-2 border-yellow-400 scale-[1.02]'
-                : 'bg-white/15'
-            }`}
-          >
-            <div className="flex-1">
-              <p className="text-pink-200 text-xs mb-1">{g.playerName}</p>
-              <p className="text-white text-lg leading-snug">{g.text}</p>
-            </div>
-            <button
-              onClick={() => speakOne(g.text, i)}
-              disabled={playingIndex !== null}
-              className="shrink-0 bg-purple-500 hover:bg-purple-600 disabled:opacity-50 text-white rounded-xl px-3 py-2 text-lg"
+      <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
+        {greetings.map((g, i) => {
+          const voice = g.voice || 'woman';
+          const meta = VOICE_META[voice] || VOICE_META.woman;
+          return (
+            <div
+              key={i}
+              className={`rounded-2xl p-4 transition-all ${
+                playingIndex === i
+                  ? 'bg-yellow-400/30 border-2 border-yellow-400 scale-[1.01]'
+                  : 'bg-white/15 border border-white/10'
+              }`}
             >
-              {playingIndex === i ? '🔊' : '▶'}
-            </button>
-          </div>
-        ))}
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-xl">{meta.emoji}</span>
+                <p className="text-pink-200 text-sm font-semibold">{g.playerName}</p>
+                <span className="text-white/40 text-xs">({meta.label})</span>
+              </div>
+              <p className="text-white text-lg leading-snug mb-3 italic">"{g.text}"</p>
+              {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+              <audio
+                ref={el => { audioRefs.current[i] = el; }}
+                src={ttsUrl(g.text, voice)}
+                controls
+                preload="none"
+                className="w-full h-10"
+                onPlay={() => setPlayingIndex(i)}
+                onEnded={() => setPlayingIndex(null)}
+                onPause={() => { if (playingIndex === i) setPlayingIndex(null); }}
+              />
+            </div>
+          );
+        })}
       </div>
     </div>
   );

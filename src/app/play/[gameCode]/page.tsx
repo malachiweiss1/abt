@@ -23,6 +23,7 @@ export default function PlayerScreen({ params }: PageProps) {
   const [myAnswer, setMyAnswer] = useState<{ isCorrect: boolean; answerValue: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [greetingText, setGreetingText] = useState('');
+  const [voiceType, setVoiceType] = useState('woman');
   const playerRef = useRef<Player | null>(null);
   const currentQuestionRef = useRef<Question | null>(null);
 
@@ -193,6 +194,10 @@ export default function PlayerScreen({ params }: PageProps) {
     setMyAnswer({ isCorrect: data.isCorrect, answerValue: value! });
   };
 
+  function parseGreetingText(value: string): string {
+    try { const p = JSON.parse(value); return p?.text || value; } catch { return value; }
+  }
+
   // JOIN SCREEN
   if (!player) {
     return (
@@ -261,7 +266,7 @@ export default function PlayerScreen({ params }: PageProps) {
                 {isGreeting ? 'הברכה נשלחה!' : myAnswer?.isCorrect ? 'כל הכבוד!' : 'אוי לא...'}
               </p>
               {isGreeting && myAnswer && (
-                <p className="text-pink-200 text-lg italic">"{myAnswer.answerValue}"</p>
+                <p className="text-pink-200 text-lg italic">"{parseGreetingText(myAnswer.answerValue)}"</p>
               )}
               <p className="text-pink-200">ממתין לשאר השחקנים...</p>
             </div>
@@ -273,13 +278,40 @@ export default function PlayerScreen({ params }: PageProps) {
               placeholder="כתבו ברכה לאביה..."
               value={greetingText}
               onChange={e => setGreetingText(e.target.value)}
-              rows={5}
+              rows={4}
               className="w-full bg-white/20 text-white placeholder-white/60 rounded-2xl p-4 text-lg border border-white/30 focus:outline-none focus:border-white resize-none"
               maxLength={300}
             />
             <p className="text-pink-200 text-sm text-left">{greetingText.length}/300</p>
+
+            {/* Voice selector */}
+            <div className="space-y-2">
+              <p className="text-pink-200 text-sm text-center">בחרו קול לברכה:</p>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { key: 'woman',    emoji: '👩', label: 'אישה' },
+                  { key: 'man',      emoji: '👨', label: 'גבר' },
+                  { key: 'child',    emoji: '👦', label: 'ילד' },
+                  { key: 'announcer',emoji: '📣', label: 'קריין כדורגל' },
+                ].map(v => (
+                  <button
+                    key={v.key}
+                    onClick={() => setVoiceType(v.key)}
+                    className={`py-3 rounded-xl font-bold text-lg transition-all flex flex-col items-center gap-1 ${
+                      voiceType === v.key
+                        ? 'bg-pink-500 text-white scale-105 shadow-lg'
+                        : 'bg-white/20 text-white hover:bg-white/30'
+                    }`}
+                  >
+                    <span className="text-2xl">{v.emoji}</span>
+                    <span className="text-sm">{v.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <button
-              onClick={() => handleSubmit(greetingText)}
+              onClick={() => handleSubmit(JSON.stringify({ text: greetingText, voice: voiceType }))}
               disabled={!greetingText.trim() || submitting}
               className="w-full bg-pink-500 hover:bg-pink-600 disabled:opacity-50 text-white font-bold py-4 rounded-2xl text-xl transition-colors"
             >
@@ -324,7 +356,7 @@ export default function PlayerScreen({ params }: PageProps) {
               {myAnswer && (
                 <div className="bg-pink-500/30 rounded-2xl p-4 border border-pink-400">
                   <p className="text-pink-200 text-sm mb-1">הברכה שלך:</p>
-                  <p className="text-white text-lg italic">"{myAnswer.answerValue}"</p>
+                  <p className="text-white text-lg italic">"{parseGreetingText(myAnswer.answerValue)}"</p>
                 </div>
               )}
               <p className="text-pink-200">הקשיבו למסך הגדול 🎂</p>
