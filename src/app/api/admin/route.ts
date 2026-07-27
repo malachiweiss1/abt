@@ -134,6 +134,24 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ success: true });
       }
 
+      case 'reset_players': {
+        // Delete all answers first (foreign key constraint)
+        await supabase.from('answers').delete().eq('game_id', game.id);
+        // Delete all players — forces everyone to sign in again
+        await supabase.from('players').delete().eq('game_id', game.id);
+        // Reset game state to waiting
+        await supabase
+          .from('games')
+          .update({
+            status: 'waiting',
+            current_question_id: null,
+            question_started_at: null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', game.id);
+        return NextResponse.json({ success: true });
+      }
+
       default:
         return NextResponse.json({ error: 'פעולה לא מוכרת' }, { status: 400 });
     }

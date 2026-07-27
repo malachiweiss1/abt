@@ -205,6 +205,18 @@ export default function AdminScreen({ params }: PageProps) {
             className="w-full bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-bold py-3 rounded-xl">
             אפס משחק
           </button>
+
+          <button
+            onClick={() => {
+              if (confirm('למחוק את כל השחקנים? כולם יצטרכו להירשם מחדש.')) {
+                doAction('reset_players');
+              }
+            }}
+            disabled={loading}
+            className="w-full bg-gray-700 hover:bg-gray-800 disabled:opacity-50 text-white font-bold py-3 rounded-xl"
+          >
+            אפס שחקנים (כניסה מחדש)
+          </button>
         </div>
 
         {/* Current Question */}
