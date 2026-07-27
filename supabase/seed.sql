@@ -26,9 +26,9 @@ VALUES (
   'multiple_choice',
   '["26", "27", "28", "29"]',
   '28',
-  15
+  300
 )
-ON CONFLICT DO NOTHING;
+ON CONFLICT (id) DO UPDATE SET time_limit_seconds = 300;
 
 -- Insert Question 2
 INSERT INTO questions (id, game_id, question_order, question_text, question_type, options, correct_answer, time_limit_seconds)
@@ -40,6 +40,20 @@ VALUES (
   'multiple_choice',
   '["תל אביב", "ירושלים", "באר שבע", "חיפה"]',
   'באר שבע',
-  15
+  300
+)
+ON CONFLICT (id) DO UPDATE SET time_limit_seconds = 300;
+
+-- Insert Question 3: Free text greeting
+INSERT INTO questions (id, game_id, question_order, question_text, question_type, options, correct_answer, time_limit_seconds)
+VALUES (
+  'b0000000-0000-0000-0000-000000000003',
+  'a0000000-0000-0000-0000-000000000001',
+  3,
+  'כתבו ברכה לאביה! 🎂',
+  'free_text_greeting',
+  '[]',
+  '',
+  300
 )
 ON CONFLICT DO NOTHING;

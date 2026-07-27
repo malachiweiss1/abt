@@ -16,7 +16,7 @@ export interface Question {
   game_id: string;
   question_order: number;
   question_text: string;
-  question_type: 'multiple_choice';
+  question_type: 'multiple_choice' | 'free_text_greeting';
   options: string[];
   correct_answer: string;
   time_limit_seconds: number;

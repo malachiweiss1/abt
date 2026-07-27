@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
     // Get question
     const { data: question, error: questionError } = await supabase
       .from('questions')
-      .select('correct_answer, time_limit_seconds')
+      .select('correct_answer, time_limit_seconds, question_type')
       .eq('id', questionId)
       .single();
 
@@ -38,24 +38,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'שאלה לא נמצאה' }, { status: 404 });
     }
 
-    // Check if time expired
+    const isGreeting = question.question_type === 'free_text_greeting';
     const startedAt = new Date(game.question_started_at!).getTime();
-    const now = Date.now();
-    const responseTimeMs = now - startedAt;
-    const timeLimitMs = question.time_limit_seconds * 1000;
+    const responseTimeMs = Date.now() - startedAt;
 
-    if (responseTimeMs > timeLimitMs + 2000) { // 2 second grace period
-      return NextResponse.json({ error: 'הזמן פג, לא ניתן להגיש תשובה' }, { status: 400 });
-    }
+    // Greeting questions: everyone is "correct", no score
+    const isCorrect = isGreeting ? true : answerValue.trim() === question.correct_answer;
+    const { baseScore, speedBonus, totalScore } = isGreeting
+      ? { baseScore: 0, speedBonus: 0, totalScore: 0 }
+      : calculateScore(isCorrect, Math.min(responseTimeMs, question.time_limit_seconds * 1000), question.time_limit_seconds);
 
-    const isCorrect = answerValue.trim() === question.correct_answer;
-    const { baseScore, speedBonus, totalScore } = calculateScore(
-      isCorrect,
-      Math.min(responseTimeMs, timeLimitMs),
-      question.time_limit_seconds
-    );
-
-    // Check for duplicate (upsert won't work due to unique constraint - check first)
+    // Check for duplicate
     const { data: existingAnswer } = await supabase
       .from('answers')
       .select('id')
@@ -76,7 +69,7 @@ export async function POST(request: NextRequest) {
         player_id: playerId,
         answer_value: answerValue.trim(),
         is_correct: isCorrect,
-        response_time_ms: Math.min(responseTimeMs, timeLimitMs),
+        response_time_ms: responseTimeMs,
         base_score: baseScore,
         speed_bonus: speedBonus,
         total_score: totalScore,
@@ -90,17 +83,37 @@ export async function POST(request: NextRequest) {
     }
 
     // Update player total score
-    const { data: player } = await supabase
-      .from('players')
-      .select('total_score')
-      .eq('id', playerId)
-      .single();
-
-    if (player) {
-      await supabase
+    if (totalScore > 0) {
+      const { data: player } = await supabase
         .from('players')
-        .update({ total_score: player.total_score + totalScore })
-        .eq('id', playerId);
+        .select('total_score')
+        .eq('id', playerId)
+        .single();
+
+      if (player) {
+        await supabase
+          .from('players')
+          .update({ total_score: player.total_score + totalScore })
+          .eq('id', playerId);
+      }
+    }
+
+    // Auto-reveal: if all players have answered, move to answer_revealed
+    const { count: answerCount } = await supabase
+      .from('answers')
+      .select('*', { count: 'exact', head: true })
+      .eq('question_id', questionId);
+
+    const { count: playerCount } = await supabase
+      .from('players')
+      .select('*', { count: 'exact', head: true })
+      .eq('game_id', game.id);
+
+    if (answerCount !== null && playerCount !== null && answerCount >= playerCount && playerCount > 0) {
+      await supabase
+        .from('games')
+        .update({ status: 'answer_revealed', updated_at: new Date().toISOString() })
+        .eq('id', game.id);
     }
 
     return NextResponse.json({ answer, isCorrect });

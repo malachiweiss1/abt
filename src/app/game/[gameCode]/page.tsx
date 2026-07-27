@@ -3,8 +3,8 @@
 import { use, useState, useEffect, useCallback } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { createClient } from '@/lib/supabase/client';
-import Timer from '@/components/Timer';
 import Confetti from '@/components/Confetti';
+import GreetingPlayer from '@/components/GreetingPlayer';
 import type { Game, Question, Player, Answer } from '@/types';
 
 interface PageProps {
@@ -18,7 +18,6 @@ export default function GameScreen({ params }: PageProps) {
   const [players, setPlayers] = useState<Player[]>([]);
   const [answers, setAnswers] = useState<Answer[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [timeExpired, setTimeExpired] = useState(false);
   const [origin, setOrigin] = useState('');
 
   useEffect(() => {
@@ -50,7 +49,6 @@ export default function GameScreen({ params }: PageProps) {
         .eq('id', gameData.current_question_id)
         .single();
       setCurrentQuestion(questionData);
-      setTimeExpired(false);
 
       if (gameData.status === 'question_active' || gameData.status === 'answer_revealed') {
         const { data: answersData } = await supabase
@@ -111,6 +109,7 @@ export default function GameScreen({ params }: PageProps) {
 
   const correctAnswers = answers.filter(a => a.is_correct).length;
   const incorrectAnswers = answers.filter(a => !a.is_correct).length;
+  const isGreetingQuestion = currentQuestion?.question_type === 'free_text_greeting';
 
   return (
     <div className="min-h-screen p-6 flex flex-col" dir="rtl">
@@ -158,40 +157,45 @@ export default function GameScreen({ params }: PageProps) {
             <h2 className="text-4xl font-bold text-white">{currentQuestion.question_text}</h2>
           </div>
 
-          <div className="w-full max-w-sm">
-            <Timer
-              startedAt={game.question_started_at!}
-              timeLimitSeconds={currentQuestion.time_limit_seconds}
-              onExpire={() => setTimeExpired(true)}
-            />
-          </div>
-
           <div className="bg-white/20 backdrop-blur-sm rounded-2xl p-6 text-center">
             <p className="text-white text-3xl font-bold">
-              {answers.length} / {players.length} ענו
+              {answers.length} / {players.length} {isGreetingQuestion ? 'שלחו ברכה' : 'ענו'}
             </p>
-            {timeExpired && <p className="text-red-300 text-xl mt-2">הזמן פג!</p>}
           </div>
         </div>
       )}
 
       {/* Answer Revealed */}
       {game.status === 'answer_revealed' && currentQuestion && (
-        <div className="flex-1 flex flex-col items-center gap-6">
-          <div className="bg-green-500/80 backdrop-blur-sm rounded-3xl p-8 text-center w-full max-w-3xl">
-            <p className="text-white text-xl mb-2">התשובה הנכונה:</p>
-            <h2 className="text-5xl font-bold text-white">{currentQuestion.correct_answer}</h2>
-          </div>
-          <div className="flex gap-8">
-            <div className="bg-green-500/50 rounded-2xl p-6 text-center">
-              <p className="text-4xl font-bold text-white">✓ {correctAnswers}</p>
-              <p className="text-green-200">ענו נכון</p>
-            </div>
-            <div className="bg-red-500/50 rounded-2xl p-6 text-center">
-              <p className="text-4xl font-bold text-white">✗ {incorrectAnswers}</p>
-              <p className="text-red-200">ענו לא נכון</p>
-            </div>
-          </div>
+        <div className="flex-1 flex flex-col items-center gap-6 w-full max-w-3xl mx-auto">
+          {isGreetingQuestion ? (
+            <>
+              <h2 className="text-4xl font-bold text-white text-center">💌 ברכות לאביה</h2>
+              <GreetingPlayer
+                greetings={answers.map(a => ({
+                  playerName: players.find(p => p.id === a.player_id)?.display_name ?? '?',
+                  text: a.answer_value,
+                }))}
+              />
+            </>
+          ) : (
+            <>
+              <div className="bg-green-500/80 backdrop-blur-sm rounded-3xl p-8 text-center w-full">
+                <p className="text-white text-xl mb-2">התשובה הנכונה:</p>
+                <h2 className="text-5xl font-bold text-white">{currentQuestion.correct_answer}</h2>
+              </div>
+              <div className="flex gap-8">
+                <div className="bg-green-500/50 rounded-2xl p-6 text-center">
+                  <p className="text-4xl font-bold text-white">✓ {correctAnswers}</p>
+                  <p className="text-green-200">ענו נכון</p>
+                </div>
+                <div className="bg-red-500/50 rounded-2xl p-6 text-center">
+                  <p className="text-4xl font-bold text-white">✗ {incorrectAnswers}</p>
+                  <p className="text-red-200">ענו לא נכון</p>
+                </div>
+              </div>
+            </>
+          )}
         </div>
       )}
 

@@ -2,7 +2,6 @@
 
 import { use, useState, useEffect, useCallback, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import Timer from '@/components/Timer';
 import type { Game, Question, Player } from '@/types';
 
 const STORAGE_KEY = 'birthday_quiz_player';
@@ -23,7 +22,7 @@ export default function PlayerScreen({ params }: PageProps) {
   const [submitting, setSubmitting] = useState(false);
   const [myAnswer, setMyAnswer] = useState<{ isCorrect: boolean; answerValue: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [timeExpired, setTimeExpired] = useState(false);
+  const [greetingText, setGreetingText] = useState('');
   const playerRef = useRef<Player | null>(null);
   const currentQuestionRef = useRef<Question | null>(null);
 
@@ -55,7 +54,7 @@ export default function PlayerScreen({ params }: PageProps) {
         setSelectedAnswer(null);
         setSubmitted(false);
         setMyAnswer(null);
-        setTimeExpired(false);
+        setGreetingText('');
       }
 
       // Check if this player already answered
@@ -160,8 +159,9 @@ export default function PlayerScreen({ params }: PageProps) {
     loadGame(data.player.id);
   };
 
-  const handleSubmit = async () => {
-    if (!selectedAnswer || !player || !currentQuestion || submitted || submitting) return;
+  const handleSubmit = async (overrideValue?: string) => {
+    const value = overrideValue ?? selectedAnswer;
+    if (!value || !player || !currentQuestion || submitted || submitting) return;
     setSubmitting(true);
     setError(null);
 
@@ -172,7 +172,7 @@ export default function PlayerScreen({ params }: PageProps) {
         gameCode,
         questionId: currentQuestion.id,
         playerId: player.id,
-        answerValue: selectedAnswer,
+        answerValue: value,
       }),
     });
 
@@ -190,7 +190,7 @@ export default function PlayerScreen({ params }: PageProps) {
     }
 
     setSubmitted(true);
-    setMyAnswer({ isCorrect: data.isCorrect, answerValue: selectedAnswer });
+    setMyAnswer({ isCorrect: data.isCorrect, answerValue: value! });
   };
 
   // JOIN SCREEN
@@ -244,15 +244,10 @@ export default function PlayerScreen({ params }: PageProps) {
 
   // QUESTION ACTIVE
   if (game.status === 'question_active' && currentQuestion) {
+    const isGreeting = currentQuestion.question_type === 'free_text_greeting';
+
     return (
       <div className="min-h-screen p-4 flex flex-col" dir="rtl">
-        <div className="mb-4">
-          <Timer
-            startedAt={game.question_started_at!}
-            timeLimitSeconds={currentQuestion.time_limit_seconds}
-            onExpire={() => setTimeExpired(true)}
-          />
-        </div>
         <div className="bg-white/20 backdrop-blur-sm rounded-2xl p-6 mb-6 text-center">
           <p className="text-pink-200 text-sm mb-1">שאלה {currentQuestion.question_order}</p>
           <h2 className="text-2xl font-bold text-white">{currentQuestion.question_text}</h2>
@@ -261,40 +256,60 @@ export default function PlayerScreen({ params }: PageProps) {
         {submitted ? (
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center space-y-4">
-              <div className="text-5xl">{myAnswer?.isCorrect ? '✅' : '❌'}</div>
+              <div className="text-5xl">{isGreeting ? '💌' : myAnswer?.isCorrect ? '✅' : '❌'}</div>
               <p className="text-white text-2xl font-bold">
-                {myAnswer?.isCorrect ? 'כל הכבוד!' : 'אוי לא...'}
+                {isGreeting ? 'הברכה נשלחה!' : myAnswer?.isCorrect ? 'כל הכבוד!' : 'אוי לא...'}
               </p>
+              {isGreeting && myAnswer && (
+                <p className="text-pink-200 text-lg italic">"{myAnswer.answerValue}"</p>
+              )}
               <p className="text-pink-200">ממתין לשאר השחקנים...</p>
             </div>
           </div>
+        ) : isGreeting ? (
+          // FREE TEXT GREETING INPUT
+          <div className="flex-1 flex flex-col gap-4">
+            <textarea
+              placeholder="כתבו ברכה לאביה..."
+              value={greetingText}
+              onChange={e => setGreetingText(e.target.value)}
+              rows={5}
+              className="w-full bg-white/20 text-white placeholder-white/60 rounded-2xl p-4 text-lg border border-white/30 focus:outline-none focus:border-white resize-none"
+              maxLength={300}
+            />
+            <p className="text-pink-200 text-sm text-left">{greetingText.length}/300</p>
+            <button
+              onClick={() => handleSubmit(greetingText)}
+              disabled={!greetingText.trim() || submitting}
+              className="w-full bg-pink-500 hover:bg-pink-600 disabled:opacity-50 text-white font-bold py-4 rounded-2xl text-xl transition-colors"
+            >
+              {submitting ? 'שולח...' : '💌 שלח ברכה'}
+            </button>
+            {error && <p className="text-red-300 text-center">{error}</p>}
+          </div>
         ) : (
+          // MULTIPLE CHOICE
           <div className="flex-1 flex flex-col gap-3">
             {(currentQuestion.options as string[]).map((option) => (
               <button
                 key={option}
-                onClick={() => !timeExpired && setSelectedAnswer(option)}
-                disabled={timeExpired}
+                onClick={() => setSelectedAnswer(option)}
                 className={`w-full py-5 rounded-2xl text-xl font-bold transition-all ${
                   selectedAnswer === option
                     ? 'bg-pink-500 text-white scale-105 shadow-lg'
                     : 'bg-white/20 text-white hover:bg-white/30'
-                } ${timeExpired ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                } cursor-pointer`}
               >
                 {option}
               </button>
             ))}
-            {timeExpired ? (
-              <p className="text-center text-red-300 text-xl mt-4">הזמן פג!</p>
-            ) : (
-              <button
-                onClick={handleSubmit}
-                disabled={!selectedAnswer || submitting}
-                className="w-full mt-4 bg-green-500 hover:bg-green-600 disabled:opacity-50 text-white font-bold py-4 rounded-2xl text-xl transition-colors"
-              >
-                {submitting ? 'שולח...' : 'שלח תשובה'}
-              </button>
-            )}
+            <button
+              onClick={() => handleSubmit()}
+              disabled={!selectedAnswer || submitting}
+              className="w-full mt-4 bg-green-500 hover:bg-green-600 disabled:opacity-50 text-white font-bold py-4 rounded-2xl text-xl transition-colors"
+            >
+              {submitting ? 'שולח...' : 'שלח תשובה'}
+            </button>
             {error && <p className="text-red-300 text-center">{error}</p>}
           </div>
         )}
@@ -304,10 +319,23 @@ export default function PlayerScreen({ params }: PageProps) {
 
   // ANSWER REVEALED
   if (game.status === 'answer_revealed' && currentQuestion) {
+    const isGreeting = currentQuestion.question_type === 'free_text_greeting';
     return (
       <div className="min-h-screen flex items-center justify-center p-4" dir="rtl">
-        <div className="text-center space-y-6">
-          {myAnswer ? (
+        <div className="text-center space-y-6 max-w-sm w-full">
+          {isGreeting ? (
+            <>
+              <div className="text-6xl">💌</div>
+              <h2 className="text-3xl font-bold text-white">הברכות מושמעות!</h2>
+              {myAnswer && (
+                <div className="bg-pink-500/30 rounded-2xl p-4 border border-pink-400">
+                  <p className="text-pink-200 text-sm mb-1">הברכה שלך:</p>
+                  <p className="text-white text-lg italic">"{myAnswer.answerValue}"</p>
+                </div>
+              )}
+              <p className="text-pink-200">הקשיבו למסך הגדול 🎂</p>
+            </>
+          ) : myAnswer ? (
             <>
               <div className="text-6xl">{myAnswer.isCorrect ? '🎉' : '😔'}</div>
               <h2 className="text-3xl font-bold text-white">
