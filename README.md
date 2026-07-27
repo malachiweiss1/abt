@@ -1,36 +1,120 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# כמה אתם מכירים את אביה? - Birthday Quiz App
 
-## Getting Started
+A real-time birthday quiz app for Aviya's birthday party built with Next.js, Supabase, and Tailwind CSS.
 
-First, run the development server:
+## Features
+
+- Real-time multiplayer quiz using Supabase Realtime
+- QR code for easy mobile joining
+- Timer per question with speed bonus scoring
+- Live leaderboard
+- Host/admin control panel
+
+## Routes
+
+- `/` - Home page with links to all screens
+- `/game/AVIYA28` - Main game screen (TV/big display with QR code)
+- `/play/AVIYA28` - Player screen (mobile phones)
+- `/admin/AVIYA28` - Host/admin control panel (password protected)
+
+## Local Development Setup
+
+### Prerequisites
+
+- Node.js 18+
+- A Supabase project (free tier works)
+
+### 1. Clone and install dependencies
+
+```bash
+npm install
+```
+
+### 2. Set up environment variables
+
+Copy the example env file and fill in your values:
+
+```bash
+cp .env.local.example .env.local
+```
+
+Edit `.env.local`:
+
+```
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key_here
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key_here
+ADMIN_PASSWORD=choose_a_secure_password
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+```
+
+### 3. Set up Supabase database
+
+1. Go to your Supabase project dashboard
+2. Open the SQL Editor
+3. Run the migration: copy and paste the contents of `supabase/migrations/001_schema.sql`
+4. Run the seed data: copy and paste the contents of `supabase/seed.sql`
+
+### 4. Enable Supabase Realtime
+
+In your Supabase dashboard:
+1. Go to Database > Replication
+2. Make sure `supabase_realtime` publication includes the tables: `games`, `questions`, `players`, `answers`
+
+### 5. Run the dev server
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Supabase Setup Details
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### Required Tables
 
-## Learn More
+- `games` - Game sessions
+- `questions` - Quiz questions with multiple choice options (stored as JSONB)
+- `players` - Players who joined a game
+- `answers` - Player answers with scoring
 
-To learn more about Next.js, take a look at the following resources:
+### Row Level Security
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+The schema uses RLS with public read access. All writes go through server-side API routes using the service role key, so the anon key is safe to expose publicly.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### Realtime
 
-## Deploy on Vercel
+The app uses Supabase Realtime to push updates to all clients when game state changes. Make sure the tables are added to the `supabase_realtime` publication (the migration SQL handles this).
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Environment Variables
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+| Variable | Description |
+|----------|-------------|
+| `NEXT_PUBLIC_SUPABASE_URL` | Your Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Your Supabase anonymous key (safe to expose) |
+| `SUPABASE_SERVICE_ROLE_KEY` | Your Supabase service role key (keep secret!) |
+| `ADMIN_PASSWORD` | Password for the admin/host control panel |
+| `NEXT_PUBLIC_APP_URL` | Your app's public URL (used for QR code generation) |
+
+## Deployment to Vercel
+
+1. Push this repo to GitHub
+2. Import the project in Vercel
+3. Add all environment variables in Vercel project settings
+4. Set `NEXT_PUBLIC_APP_URL` to your Vercel domain (e.g. `https://your-app.vercel.app`)
+5. Deploy!
+
+## Scoring System
+
+- Correct answer: **1000 base points**
+- Speed bonus: up to **500 additional points** based on how fast you answered
+- Formula: `speedBonus = 500 * (timeRemaining / timeLimit)`
+
+## Game Flow (Admin Controls)
+
+1. Share the QR code from `/game/AVIYA28` - players scan and join at `/play/AVIYA28`
+2. Admin at `/admin/AVIYA28` clicks "הצג שאלה" (Show Question)
+3. Players answer on their phones within the time limit
+4. Admin clicks "חשוף תשובה" (Reveal Answer)
+5. Admin clicks "הצג דירוג" (Show Leaderboard)
+6. Admin clicks "לשאלה הבאה" (Next Question) or "סיים משחק" (Finish Game) on last question
