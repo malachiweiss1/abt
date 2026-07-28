@@ -15,7 +15,7 @@ interface GreetingPlayerProps {
 const VOICE_META: Record<string, { emoji: string; label: string; pitch: number; rate: number }> = {
   woman:    { emoji: '👩', label: 'אישה',  pitch: 1.1, rate: 0.9 },
   man:      { emoji: '👨', label: 'גבר',   pitch: 0.7, rate: 0.9 },
-  child:    { emoji: '👦', label: 'ילד',   pitch: 1.9, rate: 0.85 },
+  child:    { emoji: '👦', label: 'ילד',   pitch: 1.9, rate: 0.7 },
   announcer:{ emoji: '📣', label: 'קריין', pitch: 0.6, rate: 1.45 },
 };
 

@@ -193,7 +193,7 @@ export default function GameScreen({ params }: PageProps) {
             <>
               <div className="bg-green-500/80 backdrop-blur-sm rounded-3xl p-8 text-center w-full">
                 <p className="text-white text-xl mb-2">התשובה הנכונה:</p>
-                <h2 className="text-5xl font-bold text-white">{currentQuestion.correct_answer}</h2>
+                <h2 className="text-5xl font-bold text-white" dir="rtl">{currentQuestion.correct_answer}</h2>
               </div>
               <div className="flex gap-8">
                 <div className="bg-green-500/50 rounded-2xl p-6 text-center">
