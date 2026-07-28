@@ -123,12 +123,8 @@ export async function POST(request: NextRequest) {
       }
 
       case 'reset_game': {
-        // Delete all answers
-        await supabase.from('answers').delete().eq('game_id', game.id);
-        // Reset player scores
-        await supabase.from('players').update({ total_score: 0 }).eq('game_id', game.id);
-        // Reset game state
-        await supabase
+        // 1. Reset game state first (most critical)
+        const { error: gameErr } = await supabase
           .from('games')
           .update({
             status: 'waiting',
@@ -138,16 +134,37 @@ export async function POST(request: NextRequest) {
             updated_at: new Date().toISOString(),
           })
           .eq('id', game.id);
+        if (gameErr) {
+          console.error('reset_game games update failed:', gameErr);
+          return NextResponse.json({ error: `reset failed: ${gameErr.message}` }, { status: 500 });
+        }
+
+        // 2. Reset player scores
+        const { error: playersErr } = await supabase
+          .from('players').update({ total_score: 0 }).eq('game_id', game.id);
+        if (playersErr) console.error('reset_game players update failed:', playersErr);
+
+        // 3. Delete answers — use question_id IN (...) to avoid depending on game_id column
+        const { data: qs } = await supabase.from('questions').select('id').eq('game_id', game.id);
+        if (qs && qs.length > 0) {
+          const { error: answersErr } = await supabase
+            .from('answers').delete().in('question_id', qs.map(q => q.id));
+          if (answersErr) console.error('reset_game answers delete failed:', answersErr);
+        }
+
         return NextResponse.json({ success: true });
       }
 
       case 'reset_players': {
-        // Delete all answers first (foreign key constraint)
-        await supabase.from('answers').delete().eq('game_id', game.id);
+        // Delete answers via question_id
+        const { data: qs2 } = await supabase.from('questions').select('id').eq('game_id', game.id);
+        if (qs2 && qs2.length > 0) {
+          await supabase.from('answers').delete().in('question_id', qs2.map(q => q.id));
+        }
         // Delete all players — forces everyone to sign in again
         await supabase.from('players').delete().eq('game_id', game.id);
         // Reset game state to waiting
-        await supabase
+        const { error: gameErr2 } = await supabase
           .from('games')
           .update({
             status: 'waiting',
@@ -157,6 +174,10 @@ export async function POST(request: NextRequest) {
             updated_at: new Date().toISOString(),
           })
           .eq('id', game.id);
+        if (gameErr2) {
+          console.error('reset_players games update failed:', gameErr2);
+          return NextResponse.json({ error: `reset failed: ${gameErr2.message}` }, { status: 500 });
+        }
         return NextResponse.json({ success: true });
       }
 
