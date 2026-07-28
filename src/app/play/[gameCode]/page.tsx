@@ -283,7 +283,7 @@ export default function PlayerScreen({ params }: PageProps) {
         <div className="bg-white/20 backdrop-blur-sm rounded-2xl p-6 mb-6 text-center">
           <p className="text-pink-200 text-sm mb-1">שאלה {currentQuestion.question_order}</p>
           <h2 className="text-2xl font-bold text-white">
-            {isGreeting ? 'כתבו ברכה לאביה!' : isDrawing ? 'תחרות ציורים!' : currentQuestion.question_text}
+            {isGreeting ? 'כתבו ברכה לאביה!' : isDrawing ? "Draw Aviya's father!" : currentQuestion.question_text}
           </h2>
         </div>
 

@@ -434,7 +434,7 @@ export default function AdminScreen({ params }: PageProps) {
               {currentQuestion.question_type === 'free_text_greeting'
                 ? 'כתבו ברכה לאביה!'
                 : currentQuestion.question_type === 'drawing_contest'
-                ? 'תחרות ציורים!'
+                ? "Draw Aviya's father!"
                 : currentQuestion.question_text}
             </p>
             <p className="text-green-300 mt-2">תשובה נכונה: {currentQuestion.correct_answer}</p>

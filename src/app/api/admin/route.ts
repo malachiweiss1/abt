@@ -124,13 +124,13 @@ export async function POST(request: NextRequest) {
 
       case 'reset_game': {
         // 1. Reset game state first (most critical)
-        // Note: greeting_index intentionally omitted — updated separately after schema reload
         const { error: gameErr } = await supabase
           .from('games')
           .update({
             status: 'waiting',
             current_question_id: null,
             question_started_at: null,
+            greeting_index: -1,
             updated_at: new Date().toISOString(),
           })
           .eq('id', game.id);
@@ -170,6 +170,7 @@ export async function POST(request: NextRequest) {
             status: 'waiting',
             current_question_id: null,
             question_started_at: null,
+            greeting_index: -1,
             updated_at: new Date().toISOString(),
           })
           .eq('id', game.id);
