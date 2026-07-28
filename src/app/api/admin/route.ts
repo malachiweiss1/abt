@@ -123,14 +123,13 @@ export async function POST(request: NextRequest) {
       }
 
       case 'reset_game': {
-        // 1. Reset game state first (most critical)
+        // 1. Reset game state first (most critical) — exclude greeting_index (schema cache issue)
         const { error: gameErr } = await supabase
           .from('games')
           .update({
             status: 'waiting',
             current_question_id: null,
             question_started_at: null,
-            greeting_index: -1,
             updated_at: new Date().toISOString(),
           })
           .eq('id', game.id);
@@ -138,6 +137,9 @@ export async function POST(request: NextRequest) {
           console.error('reset_game games update failed:', gameErr);
           return NextResponse.json({ error: `reset failed: ${gameErr.message}` }, { status: 500 });
         }
+
+        // Reset greeting_index via RPC (bypasses schema cache)
+        await supabase.rpc('set_greeting_index', { p_game_id: game.id, p_index: -1 });
 
         // 2. Reset player scores
         const { error: playersErr } = await supabase
@@ -163,14 +165,13 @@ export async function POST(request: NextRequest) {
         }
         // Delete all players — forces everyone to sign in again
         await supabase.from('players').delete().eq('game_id', game.id);
-        // Reset game state to waiting
+        // Reset game state to waiting — exclude greeting_index (schema cache issue)
         const { error: gameErr2 } = await supabase
           .from('games')
           .update({
             status: 'waiting',
             current_question_id: null,
             question_started_at: null,
-            greeting_index: -1,
             updated_at: new Date().toISOString(),
           })
           .eq('id', game.id);
@@ -178,15 +179,14 @@ export async function POST(request: NextRequest) {
           console.error('reset_players games update failed:', gameErr2);
           return NextResponse.json({ error: `reset failed: ${gameErr2.message}` }, { status: 500 });
         }
+        // Reset greeting_index via RPC
+        await supabase.rpc('set_greeting_index', { p_game_id: game.id, p_index: -1 });
         return NextResponse.json({ success: true });
       }
 
       case 'greeting_start':
       case 'greeting_restart': {
-        await supabase
-          .from('games')
-          .update({ greeting_index: 0, updated_at: new Date().toISOString() })
-          .eq('id', game.id);
+        await supabase.rpc('set_greeting_index', { p_game_id: game.id, p_index: 0 });
         return NextResponse.json({ success: true });
       }
 
@@ -196,39 +196,30 @@ export async function POST(request: NextRequest) {
           .select('*', { count: 'exact', head: true })
           .eq('question_id', game.current_question_id);
         const total = count ?? 0;
-        const current = game.greeting_index ?? -1;
+        // Read current index via RPC (bypasses schema cache)
+        const { data: currentIdx } = await supabase.rpc('get_greeting_index', { p_game_id: game.id });
+        const current = (currentIdx as number) ?? -1;
         const next = current < 0 ? 0 : Math.min(current + 1, total - 1);
-        await supabase
-          .from('games')
-          .update({ greeting_index: next, updated_at: new Date().toISOString() })
-          .eq('id', game.id);
+        await supabase.rpc('set_greeting_index', { p_game_id: game.id, p_index: next });
         return NextResponse.json({ success: true });
       }
 
       case 'greeting_prev': {
-        const current = game.greeting_index ?? 0;
-        const prev = Math.max(current - 1, 0);
-        await supabase
-          .from('games')
-          .update({ greeting_index: prev, updated_at: new Date().toISOString() })
-          .eq('id', game.id);
+        const { data: currentIdx2 } = await supabase.rpc('get_greeting_index', { p_game_id: game.id });
+        const current2 = (currentIdx2 as number) ?? 0;
+        const prev = Math.max(current2 - 1, 0);
+        await supabase.rpc('set_greeting_index', { p_game_id: game.id, p_index: prev });
         return NextResponse.json({ success: true });
       }
 
       case 'greeting_stop': {
-        await supabase
-          .from('games')
-          .update({ greeting_index: -1, updated_at: new Date().toISOString() })
-          .eq('id', game.id);
+        await supabase.rpc('set_greeting_index', { p_game_id: game.id, p_index: -1 });
         return NextResponse.json({ success: true });
       }
 
       case 'greeting_goto': {
         const index = body.index as number;
-        await supabase
-          .from('games')
-          .update({ greeting_index: index, updated_at: new Date().toISOString() })
-          .eq('id', game.id);
+        await supabase.rpc('set_greeting_index', { p_game_id: game.id, p_index: index });
         return NextResponse.json({ success: true });
       }
 

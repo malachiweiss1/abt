@@ -33,7 +33,9 @@ export default function AdminScreen({ params }: PageProps) {
       .single();
 
     if (!gameData) return;
-    setGame(gameData);
+    // Read greeting_index via RPC — PostgREST schema cache doesn't know this column
+    const { data: greetingIdx } = await supabase.rpc('get_greeting_index', { p_game_id: gameData.id });
+    setGame({ ...gameData, greeting_index: (greetingIdx as number) ?? -1 });
 
     const { data: questionsData } = await supabase
       .from('questions')
