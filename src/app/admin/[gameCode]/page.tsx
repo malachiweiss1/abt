@@ -223,7 +223,9 @@ export default function AdminScreen({ params }: PageProps) {
         {currentQuestion && (
           <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4">
             <h2 className="text-white font-bold text-lg mb-2">שאלה נוכחית ({currentQuestion.question_order}/{allQuestions.length})</h2>
-            <p className="text-white text-xl" dir="rtl">{currentQuestion.question_text}</p>
+            <p className="text-white text-xl" dir="rtl">
+              {currentQuestion.question_type === 'free_text_greeting' ? 'כתבו ברכה לאביה!' : currentQuestion.question_text}
+            </p>
             <p className="text-green-300 mt-2">תשובה נכונה: {currentQuestion.correct_answer}</p>
             <p className="text-pink-200 mt-2">{answers.length}/{players.length} ענו</p>
           </div>
