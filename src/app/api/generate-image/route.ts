@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import Replicate from 'replicate';
+import OpenAI from 'openai';
 import { createServerClient } from '@/lib/supabase/server';
+import * as fs from 'fs';
+import * as path from 'path';
 
 export const maxDuration = 60;
 
@@ -12,34 +14,40 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing prompt' }, { status: 400 });
     }
 
-    const sourceImageUrl =
-      currentImageUrl || `${process.env.NEXT_PUBLIC_APP_URL}/aviya_source_image.png`;
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-    const replicate = new Replicate({ auth: process.env.REPLICATE_API_TOKEN });
-
-    const output = await replicate.run('black-forest-labs/flux-kontext-dev', {
-      input: {
-        prompt: prompt.trim(),
-        input_image: sourceImageUrl,
-        output_format: 'jpg',
-        safety_tolerance: 6,
-      },
-    });
-
-    const rawUrl = Array.isArray(output) ? String(output[0]) : String(output);
-
-    if (!rawUrl || rawUrl === 'undefined') {
-      return NextResponse.json({ error: 'No image generated' }, { status: 500 });
+    // Get the image to edit: either the last generated image (refinement) or the source image
+    let imageFile: File;
+    if (currentImageUrl) {
+      const res = await fetch(currentImageUrl);
+      const buffer = Buffer.from(await res.arrayBuffer());
+      imageFile = new File([buffer], 'current.png', { type: 'image/png' });
+    } else {
+      const sourcePath = path.join(process.cwd(), 'public', 'aviya_source_image.png');
+      const buffer = fs.readFileSync(sourcePath);
+      imageFile = new File([buffer], 'aviya_source_image.png', { type: 'image/png' });
     }
 
-    // Upload to Supabase storage so the URL doesn't expire
-    const imgRes = await fetch(rawUrl);
-    const imgBuffer = Buffer.from(await imgRes.arrayBuffer());
+    const response = await openai.images.edit({
+      model: 'gpt-image-1',
+      image: imageFile,
+      prompt: prompt.trim(),
+      n: 1,
+      size: '1024x1024',
+    });
+
+    const b64 = response.data?.[0]?.b64_json;
+    if (!b64) {
+      return NextResponse.json({ error: 'No image returned from OpenAI' }, { status: 500 });
+    }
+
+    // Upload to Supabase storage
+    const imgBuffer = Buffer.from(b64, 'base64');
     const supabase = createServerClient();
-    const filePath = `ai-images/${Date.now()}.jpg`;
+    const filePath = `ai-images/${Date.now()}.png`;
     await supabase.storage
       .from('greetings')
-      .upload(filePath, imgBuffer, { contentType: 'image/jpeg', upsert: true });
+      .upload(filePath, imgBuffer, { contentType: 'image/png', upsert: true });
     const { data: publicUrlData } = supabase.storage
       .from('greetings')
       .getPublicUrl(filePath);
@@ -47,6 +55,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ imageUrl: publicUrlData.publicUrl });
   } catch (err) {
     console.error('generate-image error:', err);
-    return NextResponse.json({ error: 'Failed to generate image' }, { status: 500 });
+    const message = err instanceof Error ? err.message : 'Failed to generate image';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
