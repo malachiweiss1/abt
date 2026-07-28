@@ -12,7 +12,8 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const { action, gameCode } = await request.json();
+    const body = await request.json();
+    const { action, gameCode } = body;
     const supabase = createServerClient();
 
     const { data: game, error: gameError } = await supabase
@@ -128,6 +129,7 @@ export async function POST(request: NextRequest) {
             status: 'waiting',
             current_question_id: null,
             question_started_at: null,
+            greeting_index: -1,
             updated_at: new Date().toISOString(),
           })
           .eq('id', game.id);
@@ -146,8 +148,60 @@ export async function POST(request: NextRequest) {
             status: 'waiting',
             current_question_id: null,
             question_started_at: null,
+            greeting_index: -1,
             updated_at: new Date().toISOString(),
           })
+          .eq('id', game.id);
+        return NextResponse.json({ success: true });
+      }
+
+      case 'greeting_start':
+      case 'greeting_restart': {
+        await supabase
+          .from('games')
+          .update({ greeting_index: 0, updated_at: new Date().toISOString() })
+          .eq('id', game.id);
+        return NextResponse.json({ success: true });
+      }
+
+      case 'greeting_next': {
+        const { count } = await supabase
+          .from('answers')
+          .select('*', { count: 'exact', head: true })
+          .eq('question_id', game.current_question_id);
+        const total = count ?? 0;
+        const current = game.greeting_index ?? -1;
+        const next = current < 0 ? 0 : Math.min(current + 1, total - 1);
+        await supabase
+          .from('games')
+          .update({ greeting_index: next, updated_at: new Date().toISOString() })
+          .eq('id', game.id);
+        return NextResponse.json({ success: true });
+      }
+
+      case 'greeting_prev': {
+        const current = game.greeting_index ?? 0;
+        const prev = Math.max(current - 1, 0);
+        await supabase
+          .from('games')
+          .update({ greeting_index: prev, updated_at: new Date().toISOString() })
+          .eq('id', game.id);
+        return NextResponse.json({ success: true });
+      }
+
+      case 'greeting_stop': {
+        await supabase
+          .from('games')
+          .update({ greeting_index: -1, updated_at: new Date().toISOString() })
+          .eq('id', game.id);
+        return NextResponse.json({ success: true });
+      }
+
+      case 'greeting_goto': {
+        const index = body.index as number;
+        await supabase
+          .from('games')
+          .update({ greeting_index: index, updated_at: new Date().toISOString() })
           .eq('id', game.id);
         return NextResponse.json({ success: true });
       }

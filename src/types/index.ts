@@ -7,6 +7,7 @@ export interface Game {
   status: GameStatus;
   current_question_id: string | null;
   question_started_at: string | null;
+  greeting_index?: number; // -1 = stopped, >=0 = showing that greeting
   created_at: string;
   updated_at: string;
 }

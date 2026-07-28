@@ -48,7 +48,8 @@ export default function AdminScreen({ params }: PageProps) {
       const { data: answersData } = await supabase
         .from('answers')
         .select('*')
-        .eq('question_id', gameData.current_question_id);
+        .eq('question_id', gameData.current_question_id)
+        .order('submitted_at');
       setAnswers(answersData || []);
     } else {
       setCurrentQuestion(null);
@@ -77,7 +78,7 @@ export default function AdminScreen({ params }: PageProps) {
     return () => { supabase.removeChannel(channel); };
   }, [authenticated, gameCode, loadData, supabase]);
 
-  const doAction = async (action: string) => {
+  const doAction = async (action: string, extra?: Record<string, unknown>) => {
     setLoading(true);
     setMessage('');
     const res = await fetch('/api/admin', {
@@ -86,7 +87,7 @@ export default function AdminScreen({ params }: PageProps) {
         'Content-Type': 'application/json',
         'x-admin-password': adminPassword,
       },
-      body: JSON.stringify({ action, gameCode }),
+      body: JSON.stringify({ action, gameCode, ...extra }),
     });
     const data = await res.json();
     setLoading(false);
@@ -151,6 +152,21 @@ export default function AdminScreen({ params }: PageProps) {
 
   const currentQuestionIndex = allQuestions.findIndex(q => q.id === game?.current_question_id);
   const isLastQuestion = currentQuestionIndex === allQuestions.length - 1;
+  const isGreetingQuestion = currentQuestion?.question_type === 'free_text_greeting';
+  const greetingIndex = game?.greeting_index ?? -1;
+
+  // Parse greeting answers for the controller list
+  const greetingAnswers = isGreetingQuestion
+    ? answers.map(a => {
+        let text = a.answer_value;
+        let playerName = players.find(p => p.id === a.player_id)?.display_name ?? '?';
+        try {
+          const parsed = JSON.parse(a.answer_value);
+          if (parsed?.text) text = parsed.text;
+        } catch { /* plain text */ }
+        return { id: a.id, playerName, text };
+      })
+    : [];
 
   return (
     <div className="min-h-screen p-4" dir="rtl">
@@ -184,10 +200,17 @@ export default function AdminScreen({ params }: PageProps) {
             </button>
           )}
 
-          {game?.status === 'answer_revealed' && (
+          {game?.status === 'answer_revealed' && !isGreetingQuestion && (
             <button onClick={() => doAction('show_leaderboard')} disabled={loading}
               className="w-full bg-purple-500 hover:bg-purple-600 disabled:opacity-50 text-white font-bold py-4 rounded-xl text-lg">
               הצג דירוג
+            </button>
+          )}
+
+          {game?.status === 'answer_revealed' && isGreetingQuestion && (
+            <button onClick={() => doAction('show_leaderboard')} disabled={loading}
+              className="w-full bg-purple-500/60 hover:bg-purple-600/60 disabled:opacity-50 text-white font-bold py-3 rounded-xl">
+              סיים ברכות → הצג דירוג
             </button>
           )}
 
@@ -219,6 +242,68 @@ export default function AdminScreen({ params }: PageProps) {
           </button>
         </div>
 
+        {/* Greeting Controller */}
+        {isGreetingQuestion && game?.status === 'answer_revealed' && (
+          <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-white font-bold text-lg">🎬 שליטת ברכות</h2>
+              <span className="text-yellow-300 font-bold text-lg">
+                {greetingIndex < 0 ? 'ממתין' : `${greetingIndex + 1} / ${greetingAnswers.length}`}
+              </span>
+            </div>
+
+            {/* Main controls row */}
+            <div className="grid grid-cols-5 gap-2">
+              <button
+                onClick={() => doAction('greeting_prev')}
+                disabled={loading || greetingIndex <= 0}
+                className="bg-white/20 hover:bg-white/30 disabled:opacity-30 text-white font-bold py-3 rounded-xl text-xl"
+                title="הקודם"
+              >⏮</button>
+              <button
+                onClick={() => doAction(greetingIndex < 0 ? 'greeting_start' : 'greeting_next')}
+                disabled={loading || greetingAnswers.length === 0}
+                className="col-span-2 bg-green-500 hover:bg-green-600 disabled:opacity-50 text-white font-bold py-3 rounded-xl text-lg"
+              >
+                {greetingIndex < 0 ? '▶ התחל' : greetingIndex >= greetingAnswers.length - 1 ? '✓ סוף' : '▶ הבא'}
+              </button>
+              <button
+                onClick={() => doAction('greeting_restart')}
+                disabled={loading}
+                className="bg-white/20 hover:bg-white/30 disabled:opacity-30 text-white font-bold py-3 rounded-xl text-xl"
+                title="מהתחלה"
+              >🔄</button>
+              <button
+                onClick={() => doAction('greeting_stop')}
+                disabled={loading}
+                className="bg-red-500/60 hover:bg-red-600/60 disabled:opacity-30 text-white font-bold py-3 rounded-xl text-xl"
+                title="עצור"
+              >🛑</button>
+            </div>
+
+            {/* Greeting list — click to jump */}
+            {greetingAnswers.length > 0 && (
+              <div className="space-y-1 max-h-52 overflow-y-auto">
+                {greetingAnswers.map((g, i) => (
+                  <button
+                    key={g.id}
+                    onClick={() => doAction('greeting_goto', { index: i })}
+                    disabled={loading}
+                    className={`w-full text-right rounded-lg px-3 py-2 transition-colors ${
+                      i === greetingIndex
+                        ? 'bg-yellow-400/40 border border-yellow-400 text-white'
+                        : 'bg-white/10 hover:bg-white/20 text-white/80'
+                    }`}
+                  >
+                    <span className="font-bold text-sm">{i + 1}. {g.playerName}</span>
+                    <span className="text-xs text-white/60 mr-2">— {g.text.slice(0, 40)}{g.text.length > 40 ? '...' : ''}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Current Question */}
         {currentQuestion && (
           <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4">
@@ -232,7 +317,7 @@ export default function AdminScreen({ params }: PageProps) {
         )}
 
         {/* Answers */}
-        {answers.length > 0 && (
+        {answers.length > 0 && !isGreetingQuestion && (
           <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4">
             <h2 className="text-white font-bold text-lg mb-2">תשובות שחקנים</h2>
             <div className="space-y-2 max-h-48 overflow-y-auto">

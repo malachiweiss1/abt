@@ -1,10 +1,9 @@
 'use client';
 
-import { use, useState, useEffect, useCallback } from 'react';
+import { use, useState, useEffect, useCallback, useRef } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { createClient } from '@/lib/supabase/client';
 import Confetti from '@/components/Confetti';
-import GreetingPlayer from '@/components/GreetingPlayer';
 import type { Game, Question, Player, Answer } from '@/types';
 
 interface PageProps {
@@ -19,6 +18,7 @@ export default function GameScreen({ params }: PageProps) {
   const [answers, setAnswers] = useState<Answer[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [origin, setOrigin] = useState('');
+  const videoPollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     setOrigin(window.location.origin);
@@ -91,6 +91,71 @@ export default function GameScreen({ params }: PageProps) {
     };
   }, [gameCode, loadGameData, supabase]);
 
+  // Compute active greeting state (needed before polling useEffect so deps are in scope)
+  const isGreetingQuestion = currentQuestion?.question_type === 'free_text_greeting';
+  const greetingIndex = game?.greeting_index ?? -1;
+
+  const sortedGreetingAnswers = isGreetingQuestion
+    ? [...answers].sort((a, b) => new Date(a.submitted_at).getTime() - new Date(b.submitted_at).getTime())
+    : [];
+
+  const activeAnswer = greetingIndex >= 0 ? (sortedGreetingAnswers[greetingIndex] ?? null) : null;
+
+  let activeGreeting: { playerName: string; text: string; voice: string; predictionId?: string; videoUrl?: string } | null = null;
+  if (activeAnswer) {
+    let text = activeAnswer.answer_value;
+    let voice = 'woman';
+    let predictionId: string | undefined;
+    let videoUrl: string | undefined;
+    try {
+      const parsed = JSON.parse(activeAnswer.answer_value);
+      if (parsed?.text) {
+        text = parsed.text;
+        voice = parsed.voice || 'woman';
+        predictionId = parsed.prediction_id;
+        videoUrl = parsed.video_url;
+      }
+    } catch { /* plain text */ }
+    activeGreeting = {
+      playerName: players.find(p => p.id === activeAnswer.player_id)?.display_name ?? '?',
+      text,
+      voice,
+      predictionId,
+      videoUrl,
+    };
+  }
+
+  // Poll video-status for the currently displayed greeting (triggers DB update → real-time → loadGameData)
+  useEffect(() => {
+    if (videoPollingRef.current) {
+      clearInterval(videoPollingRef.current);
+      videoPollingRef.current = null;
+    }
+    if (!activeAnswer || !activeGreeting?.predictionId || activeGreeting?.videoUrl) return;
+
+    const answerId = activeAnswer.id;
+    const predictionId = activeGreeting.predictionId;
+
+    videoPollingRef.current = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/video-status?predictionId=${predictionId}&answerId=${answerId}`);
+        const data = await res.json();
+        if (data.status === 'done' || data.status === 'failed') {
+          clearInterval(videoPollingRef.current!);
+          videoPollingRef.current = null;
+        }
+      } catch { /* ignore transient errors */ }
+    }, 4000);
+
+    return () => {
+      if (videoPollingRef.current) {
+        clearInterval(videoPollingRef.current);
+        videoPollingRef.current = null;
+      }
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeAnswer?.id, activeAnswer?.answer_value]);
+
   if (error) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -109,7 +174,6 @@ export default function GameScreen({ params }: PageProps) {
 
   const correctAnswers = answers.filter(a => a.is_correct).length;
   const incorrectAnswers = answers.filter(a => !a.is_correct).length;
-  const isGreetingQuestion = currentQuestion?.question_type === 'free_text_greeting';
 
   return (
     <div className="min-h-screen p-6 flex flex-col" dir="rtl">
@@ -171,34 +235,47 @@ export default function GameScreen({ params }: PageProps) {
       {game.status === 'answer_revealed' && currentQuestion && (
         <div className="flex-1 flex flex-col items-center gap-6 w-full max-w-3xl mx-auto">
           {isGreetingQuestion ? (
-            <>
-              <h2 className="text-4xl font-bold text-white text-center">💌 ברכות לאביה</h2>
-              <GreetingPlayer
-                greetings={answers.map(a => {
-                  let text = a.answer_value;
-                  let voice = 'woman';
-                  let predictionId: string | undefined;
-                  let videoUrl: string | undefined;
-                  try {
-                    const parsed = JSON.parse(a.answer_value);
-                    if (parsed?.text) {
-                      text = parsed.text;
-                      voice = parsed.voice || 'woman';
-                      predictionId = parsed.prediction_id;
-                      videoUrl = parsed.video_url;
-                    }
-                  } catch { /* plain text greeting */ }
-                  return {
-                    playerName: players.find(p => p.id === a.player_id)?.display_name ?? '?',
-                    text,
-                    voice,
-                    answerId: a.id,
-                    predictionId,
-                    videoUrl,
-                  };
-                })}
-              />
-            </>
+            <div className="flex-1 flex flex-col items-center justify-center w-full gap-6">
+              {!activeGreeting ? (
+                <div className="text-center">
+                  <p className="text-5xl mb-4">💌</p>
+                  <p className="text-pink-200 text-2xl animate-pulse">ממתינים לברכה הבאה...</p>
+                </div>
+              ) : (
+                <>
+                  <div className="text-center">
+                    <p className="text-pink-200 text-lg">{greetingIndex + 1} / {sortedGreetingAnswers.length}</p>
+                    <p className="text-white text-3xl font-bold mt-1">{activeGreeting.playerName}</p>
+                  </div>
+                  <p className="text-white text-2xl leading-relaxed italic text-center px-4" dir="rtl">
+                    &ldquo;{activeGreeting.text}&rdquo;
+                  </p>
+                  {activeGreeting.videoUrl ? (
+                    // eslint-disable-next-line jsx-a11y/media-has-caption
+                    <video
+                      key={activeGreeting.videoUrl}
+                      src={activeGreeting.videoUrl}
+                      autoPlay
+                      playsInline
+                      className="w-full rounded-2xl max-h-96 bg-black"
+                    />
+                  ) : activeGreeting.predictionId ? (
+                    <div className="flex items-center gap-3 text-yellow-300 text-xl animate-pulse">
+                      <span>🎬</span><span>הוידאו מוכן בקרוב...</span>
+                    </div>
+                  ) : (
+                    // eslint-disable-next-line jsx-a11y/media-has-caption
+                    <audio
+                      key={`${activeAnswer?.id}-${activeGreeting.voice}`}
+                      src={`/api/tts?text=${encodeURIComponent(activeGreeting.text)}&voice=${encodeURIComponent(activeGreeting.voice)}`}
+                      autoPlay
+                      preload="auto"
+                      className="hidden"
+                    />
+                  )}
+                </>
+              )}
+            </div>
           ) : (
             <>
               <div className="bg-green-500/80 backdrop-blur-sm rounded-3xl p-8 text-center w-full">
