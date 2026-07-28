@@ -16,9 +16,9 @@ interface GreetingPlayerProps {
 }
 
 const VOICE_META: Record<string, { emoji: string; label: string; pitch: number; rate: number }> = {
-  woman:    { emoji: '👩', label: 'אישה',  pitch: 1.1, rate: 0.9 },
-  man:      { emoji: '👨', label: 'גבר',   pitch: 0.7, rate: 0.9 },
-  announcer:{ emoji: '📣', label: 'קריין', pitch: 0.6, rate: 1.45 },
+  woman:    { emoji: '👩', label: 'אישה',  pitch: 1.6, rate: 1.0 },
+  man:      { emoji: '👨', label: 'גבר',   pitch: 0.4, rate: 0.9 },
+  announcer:{ emoji: '📣', label: 'קריין', pitch: 0.3, rate: 1.45 },
 };
 
 export default function GreetingPlayer({ greetings }: GreetingPlayerProps) {
@@ -74,12 +74,9 @@ export default function GreetingPlayer({ greetings }: GreetingPlayerProps) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [greetings]);
 
-  const getBestVoice = (voiceType: string) => {
-    const heVoices = voices.filter(v => v.lang.startsWith('he'));
-    if (voiceType === 'man') {
-      return heVoices.find(v => /avri|male/i.test(v.name)) || heVoices[heVoices.length - 1] || null;
-    }
-    return heVoices.find(v => /hila|female/i.test(v.name)) || heVoices[0] || null;
+  const getHebrewVoice = () => {
+    // Just pick the first available Hebrew voice; pitch/rate handles gender
+    return voices.find(v => v.lang.startsWith('he')) || null;
   };
 
   const speakOne = (text: string, voiceType: string, index: number): Promise<void> =>
@@ -90,7 +87,7 @@ export default function GreetingPlayer({ greetings }: GreetingPlayerProps) {
       const meta = VOICE_META[voiceType] || VOICE_META.woman;
       utt.pitch = meta.pitch;
       utt.rate = meta.rate;
-      const voice = getBestVoice(voiceType);
+      const voice = getHebrewVoice();
       if (voice) utt.voice = voice;
       utt.onstart = () => setPlayingIndex(index);
       utt.onend = () => { setPlayingIndex(null); resolve(); };

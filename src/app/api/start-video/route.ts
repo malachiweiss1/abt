@@ -71,10 +71,18 @@ export async function POST(request: NextRequest) {
       'audio/mpeg',
     );
 
+    // Fetch latest SadTalker version from Replicate
+    const versionsRes = await fetch('https://api.replicate.com/v1/models/cjwbw/sadtalker/versions', {
+      headers: { 'Authorization': `Token ${process.env.REPLICATE_API_TOKEN}` },
+    });
+    const versionsData = await versionsRes.json();
+    const latestVersion = versionsData.results?.[0]?.id;
+    if (!latestVersion) throw new Error('Could not fetch SadTalker version');
+
     // Start Replicate SadTalker prediction
     const replicate = new Replicate({ auth: process.env.REPLICATE_API_TOKEN });
     const prediction = await replicate.predictions.create({
-      model: 'cjwbw/sadtalker',
+      version: latestVersion,
       input: {
         source_image: photoUrl,
         driven_audio: audioUrl,
