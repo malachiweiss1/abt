@@ -29,6 +29,15 @@ export default function PlayerScreen({ params }: PageProps) {
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [videoStatus, setVideoStatus] = useState<'idle' | 'starting' | 'generating' | 'done' | 'error'>('idle');
+
+  // AI image contest state
+  const [imagePrompt, setImagePrompt] = useState('');
+  const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
+  const [refineCount, setRefineCount] = useState(0);
+  const [imageGenerating, setImageGenerating] = useState(false);
+  const [imageApproved, setImageApproved] = useState(false);
+  const MAX_REFINEMENTS = 5;
+
   const playerRef = useRef<Player | null>(null);
   const currentQuestionRef = useRef<Question | null>(null);
 
@@ -62,6 +71,11 @@ export default function PlayerScreen({ params }: PageProps) {
         setMyAnswer(null);
         setGreetingText('');
         setDrawingSubmitted(false);
+        setImagePrompt('');
+        setGeneratedImageUrl(null);
+        setRefineCount(0);
+        setImageApproved(false);
+        setImageGenerating(false);
       }
 
       // Check if this player already answered
@@ -88,7 +102,6 @@ export default function PlayerScreen({ params }: PageProps) {
   }, [gameCode, supabase]);
 
   useEffect(() => {
-    // Try to restore player from localStorage
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
       try {
@@ -199,7 +212,7 @@ export default function PlayerScreen({ params }: PageProps) {
     setSubmitted(true);
     setMyAnswer({ isCorrect: data.isCorrect, answerValue: value! });
 
-    // If greeting with photo, start video generation
+    // If greeting with photo, start video generation immediately
     if (currentQuestion.question_type === 'free_text_greeting' && photoFile && data.answer?.id) {
       setVideoStatus('starting');
       try {
@@ -217,6 +230,32 @@ export default function PlayerScreen({ params }: PageProps) {
       } catch {
         setVideoStatus('error');
       }
+    }
+  };
+
+  const handleGenerateImage = async (refinementPrompt?: string) => {
+    setImageGenerating(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/generate-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: refinementPrompt || imagePrompt,
+          currentImageUrl: refinementPrompt ? generatedImageUrl : null,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.imageUrl) {
+        setError(data.error || 'שגיאה ביצירת תמונה');
+      } else {
+        setGeneratedImageUrl(data.imageUrl);
+        if (refinementPrompt) setRefineCount(c => c + 1);
+      }
+    } catch {
+      setError('שגיאת רשת — נסה שוב');
+    } finally {
+      setImageGenerating(false);
     }
   };
 
@@ -277,14 +316,21 @@ export default function PlayerScreen({ params }: PageProps) {
   if (game.status === 'question_active' && currentQuestion) {
     const isGreeting = currentQuestion.question_type === 'free_text_greeting';
     const isDrawing = currentQuestion.question_type === 'drawing_contest';
+    const isImageContest = currentQuestion.question_type === 'ai_image_contest';
+
+    const questionLabel = isGreeting
+      ? 'כתבו ברכה לאביה!'
+      : isDrawing
+      ? '🎨 ציירו!'
+      : isImageContest
+      ? '🤖 צרו תמונת AI של אביה'
+      : currentQuestion.question_text;
 
     return (
       <div className="min-h-screen p-4 flex flex-col" dir="rtl">
         <div className="bg-white/20 backdrop-blur-sm rounded-2xl p-6 mb-6 text-center">
           <p className="text-pink-200 text-sm mb-1">שאלה {currentQuestion.question_order}</p>
-          <h2 className="text-2xl font-bold text-white">
-            {isGreeting ? 'כתבו ברכה לאביה!' : isDrawing ? "Draw Aviya's father!" : currentQuestion.question_text}
-          </h2>
+          <h2 className="text-2xl font-bold text-white">{questionLabel}</h2>
         </div>
 
         {isDrawing ? (
@@ -314,6 +360,88 @@ export default function PlayerScreen({ params }: PageProps) {
               />
             </div>
           )
+        ) : isImageContest ? (
+          // AI IMAGE CONTEST
+          submitted || imageApproved ? (
+            <div className="flex-1 flex items-center justify-center">
+              <div className="text-center space-y-4">
+                <div className="text-5xl">🤖</div>
+                <p className="text-white text-2xl font-bold">התמונה אושרה!</p>
+                {generatedImageUrl && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={generatedImageUrl} alt="תמונה שנוצרה" className="w-48 h-48 object-cover rounded-2xl mx-auto border-2 border-pink-400" />
+                )}
+                <p className="text-pink-200">ממתין לשאר השחקנים...</p>
+              </div>
+            </div>
+          ) : (
+            <div className="flex-1 flex flex-col gap-4">
+              {!generatedImageUrl ? (
+                // Initial prompt input
+                <>
+                  <p className="text-pink-200 text-sm text-center">תארו את אביה — לדוגמה: אביה, מלכה עם כתר ופרחים</p>
+                  <textarea
+                    placeholder="הזן תיאור..."
+                    value={imagePrompt}
+                    onChange={e => setImagePrompt(e.target.value)}
+                    rows={3}
+                    className="w-full bg-white/20 text-white placeholder-white/60 rounded-2xl p-4 text-lg border border-white/30 focus:outline-none focus:border-white resize-none"
+                    maxLength={200}
+                    disabled={imageGenerating}
+                  />
+                  <button
+                    onClick={() => handleGenerateImage()}
+                    disabled={!imagePrompt.trim() || imageGenerating}
+                    className="w-full bg-purple-500 hover:bg-purple-600 disabled:opacity-50 text-white font-bold py-4 rounded-2xl text-xl"
+                  >
+                    {imageGenerating ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <span className="animate-spin">⚙️</span> יוצר תמונה...
+                      </span>
+                    ) : '✨ צור תמונה'}
+                  </button>
+                  {error && <p className="text-red-300 text-center">{error}</p>}
+                </>
+              ) : (
+                // Show generated image + approve/refine options
+                <>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={generatedImageUrl}
+                    alt="תמונה שנוצרה"
+                    className="w-full rounded-2xl object-contain max-h-64 bg-white/10"
+                  />
+                  <p className="text-pink-200 text-sm text-center">
+                    {refineCount > 0 ? `תיקון ${refineCount}/${MAX_REFINEMENTS}` : 'תמונה ראשונה'}
+                  </p>
+
+                  {/* Approve button */}
+                  <button
+                    onClick={async () => {
+                      setImageApproved(true);
+                      await handleSubmit(generatedImageUrl);
+                    }}
+                    disabled={submitting || imageGenerating}
+                    className="w-full bg-green-500 hover:bg-green-600 disabled:opacity-50 text-white font-bold py-4 rounded-2xl text-xl"
+                  >
+                    {submitting ? 'שולח...' : '✓ אשר תמונה'}
+                  </button>
+
+                  {/* Refine option — up to MAX_REFINEMENTS times */}
+                  {refineCount < MAX_REFINEMENTS && !imageGenerating && (
+                    <RefinementInput
+                      disabled={imageGenerating || submitting}
+                      onRefine={(refinementText) => handleGenerateImage(refinementText)}
+                    />
+                  )}
+                  {imageGenerating && (
+                    <div className="text-center text-yellow-300 animate-pulse text-lg">⚙️ מתקן תמונה...</div>
+                  )}
+                  {error && <p className="text-red-300 text-center">{error}</p>}
+                </>
+              )}
+            </div>
+          )
         ) : submitted ? (
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center space-y-4">
@@ -322,11 +450,11 @@ export default function PlayerScreen({ params }: PageProps) {
                 {isGreeting ? 'הברכה נשלחה!' : myAnswer?.isCorrect ? 'כל הכבוד!' : 'אוי לא...'}
               </p>
               {isGreeting && myAnswer && (
-                <p className="text-pink-200 text-lg italic">"{parseGreetingText(myAnswer.answerValue)}"</p>
+                <p className="text-pink-200 text-lg italic">&ldquo;{parseGreetingText(myAnswer.answerValue)}&rdquo;</p>
               )}
               {videoStatus === 'starting' && <p className="text-yellow-300 text-sm animate-pulse">מכין את הוידאו שלך...</p>}
               {videoStatus === 'generating' && <p className="text-green-300 text-sm animate-pulse">✨ הוידאו שלך בדרך!</p>}
-              {videoStatus === 'error' && <p className="text-orange-300 text-sm">הוידאו לא הצליח, הברכה תושמע כקול</p>}
+              {videoStatus === 'error' && <p className="text-orange-300 text-sm">הוידאו לא הצליח</p>}
               <p className="text-pink-200">ממתין לשאר השחקנים...</p>
             </div>
           </div>
@@ -437,26 +565,23 @@ export default function PlayerScreen({ params }: PageProps) {
   if (game.status === 'answer_revealed' && currentQuestion) {
     const isGreeting = currentQuestion.question_type === 'free_text_greeting';
     const isDrawing = currentQuestion.question_type === 'drawing_contest';
+    const isImageContest = currentQuestion.question_type === 'ai_image_contest';
     return (
       <div className="min-h-screen flex items-center justify-center p-4" dir="rtl">
         <div className="text-center space-y-6 max-w-sm w-full">
-          {isDrawing ? (
+          {isDrawing || isImageContest ? (
             <>
-              <div className="text-6xl">🎨</div>
-              <h2 className="text-3xl font-bold text-white">הציורים מוצגים!</h2>
-              <p className="text-pink-200">הקשיבו למסך הגדול 🎨</p>
+              <div className="text-6xl">{isDrawing ? '🎨' : '🤖'}</div>
+              <h2 className="text-3xl font-bold text-white">
+                {isDrawing ? 'הציורים מוצגים!' : 'התמונות מוצגות!'}
+              </h2>
+              <p className="text-pink-200">הסתכלו על המסך הגדול</p>
             </>
           ) : isGreeting ? (
             <>
-              <div className="text-6xl">💌</div>
-              <h2 className="text-3xl font-bold text-white">הברכות מושמעות!</h2>
-              {myAnswer && (
-                <div className="bg-pink-500/30 rounded-2xl p-4 border border-pink-400">
-                  <p className="text-pink-200 text-sm mb-1">הברכה שלך:</p>
-                  <p className="text-white text-lg italic">"{parseGreetingText(myAnswer.answerValue)}"</p>
-                </div>
-              )}
-              <p className="text-pink-200">הקשיבו למסך הגדול 🎂</p>
+              <div className="text-6xl">🎬</div>
+              <h2 className="text-3xl font-bold text-white">הסרטונים מוצגים!</h2>
+              <p className="text-pink-200">הסתכלו על המסך הגדול 🎂</p>
             </>
           ) : myAnswer ? (
             <>
@@ -515,4 +640,36 @@ export default function PlayerScreen({ params }: PageProps) {
   }
 
   return null;
+}
+
+// Small sub-component for the refinement input
+function RefinementInput({
+  disabled,
+  onRefine,
+}: {
+  disabled: boolean;
+  onRefine: (text: string) => void;
+}) {
+  const [text, setText] = useState('');
+  return (
+    <div className="space-y-2">
+      <p className="text-pink-200 text-sm text-center">לא מרוצה? תארו שינוי:</p>
+      <input
+        type="text"
+        placeholder="למשל: תוסיף כוכבים ברקע"
+        value={text}
+        onChange={e => setText(e.target.value)}
+        disabled={disabled}
+        className="w-full bg-white/20 text-white placeholder-white/60 rounded-xl p-3 text-base border border-white/30 focus:outline-none focus:border-white"
+        maxLength={150}
+      />
+      <button
+        onClick={() => { onRefine(text); setText(''); }}
+        disabled={disabled || !text.trim()}
+        className="w-full bg-yellow-500 hover:bg-yellow-600 disabled:opacity-50 text-white font-bold py-3 rounded-xl"
+      >
+        🔄 תקן תמונה
+      </button>
+    </div>
+  );
 }

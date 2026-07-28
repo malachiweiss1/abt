@@ -22,6 +22,7 @@ export default function AdminScreen({ params }: PageProps) {
   const [message, setMessage] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
   const [drawingScore, setDrawingScore] = useState<number | null>(null);
+  const [greetingScore, setGreetingScore] = useState<number | null>(null);
 
   const supabase = createClient();
 
@@ -163,6 +164,8 @@ export default function AdminScreen({ params }: PageProps) {
   const isLastQuestion = currentQuestionIndex === allQuestions.length - 1;
   const isGreetingQuestion = currentQuestion?.question_type === 'free_text_greeting';
   const isDrawingQuestion = currentQuestion?.question_type === 'drawing_contest';
+  const isImageContestQuestion = currentQuestion?.question_type === 'ai_image_contest';
+  const isImageQuestion = isDrawingQuestion || isImageContestQuestion;
   const greetingIndex = game?.greeting_index ?? -1;
 
   // Parse greeting answers for the controller list
@@ -225,7 +228,7 @@ export default function AdminScreen({ params }: PageProps) {
             </button>
           )}
 
-          {game?.status === 'answer_revealed' && !isGreetingQuestion && !isDrawingQuestion && (
+          {game?.status === 'answer_revealed' && !isGreetingQuestion && !isImageQuestion && (
             <button onClick={() => doAction('show_leaderboard')} disabled={loading}
               className="w-full bg-purple-500 hover:bg-purple-600 disabled:opacity-50 text-white font-bold py-4 rounded-xl text-lg">
               הצג דירוג
@@ -267,11 +270,11 @@ export default function AdminScreen({ params }: PageProps) {
           </button>
         </div>
 
-        {/* Drawing Controller */}
-        {isDrawingQuestion && game?.status === 'answer_revealed' && (
+        {/* Drawing / AI Image Controller */}
+        {isImageQuestion && game?.status === 'answer_revealed' && (
           <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 space-y-4" dir="rtl">
             <div className="flex items-center justify-between">
-              <h2 className="text-white font-bold text-lg">🎨 ניקוד ציורים</h2>
+              <h2 className="text-white font-bold text-lg">{isDrawingQuestion ? '🎨 ניקוד ציורים' : '🤖 ניקוד תמונות AI'}</h2>
               <span className="text-yellow-300 font-bold text-lg">
                 {greetingIndex < 0 ? 'טרם התחיל' : `${greetingIndex + 1} / ${drawingAnswers.length}`}
               </span>
@@ -370,7 +373,7 @@ export default function AdminScreen({ params }: PageProps) {
         {isGreetingQuestion && game?.status === 'answer_revealed' && (
           <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 space-y-4">
             <div className="flex items-center justify-between">
-              <h2 className="text-white font-bold text-lg">🎬 שליטת ברכות</h2>
+              <h2 className="text-white font-bold text-lg">🎬 שליטת סרטונים</h2>
               <span className="text-yellow-300 font-bold text-lg">
                 {greetingIndex < 0 ? 'ממתין' : `${greetingIndex + 1} / ${greetingAnswers.length}`}
               </span>
@@ -405,26 +408,80 @@ export default function AdminScreen({ params }: PageProps) {
               >🛑</button>
             </div>
 
+            {/* Scoring for current video */}
+            {greetingIndex >= 0 && greetingAnswers[greetingIndex] && (() => {
+              const currentGreetingAnswer = answers[greetingIndex];
+              const alreadyScored = currentGreetingAnswer && (currentGreetingAnswer.base_score ?? 0) > 0;
+              const scoredValue = alreadyScored ? Math.round((currentGreetingAnswer.base_score ?? 0) / 100) : null;
+              return (
+                <div className="bg-white/10 rounded-xl p-3 space-y-2">
+                  <p className="text-white font-bold text-center">
+                    ניקוד סרטון — {greetingAnswers[greetingIndex].playerName}
+                  </p>
+                  {alreadyScored ? (
+                    <p className="text-yellow-300 text-center text-lg font-bold">ניקוד: {scoredValue}/10</p>
+                  ) : (
+                    <>
+                      <div className="grid grid-cols-5 gap-2">
+                        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => (
+                          <button
+                            key={n}
+                            onClick={() => setGreetingScore(n)}
+                            className={`py-2 rounded-lg font-bold text-lg transition-colors ${
+                              greetingScore === n
+                                ? 'bg-yellow-400 text-black'
+                                : 'bg-white/20 text-white hover:bg-white/30'
+                            }`}
+                          >{n}</button>
+                        ))}
+                      </div>
+                      <button
+                        onClick={async () => {
+                          if (greetingScore === null || !currentGreetingAnswer) return;
+                          await doAction('score_drawing', { answerId: currentGreetingAnswer.id, score: greetingScore });
+                          setGreetingScore(null);
+                        }}
+                        disabled={greetingScore === null || loading || !currentGreetingAnswer}
+                        className="w-full bg-green-500 hover:bg-green-600 disabled:opacity-50 text-white font-bold py-2 rounded-xl"
+                      >
+                        שלח ניקוד ✓
+                      </button>
+                    </>
+                  )}
+                </div>
+              );
+            })()}
+
             {/* Greeting list — click to jump */}
             {greetingAnswers.length > 0 && (
-              <div className="space-y-1 max-h-52 overflow-y-auto">
-                {greetingAnswers.map((g, i) => (
-                  <button
-                    key={g.id}
-                    onClick={() => doAction('greeting_goto', { index: i })}
-                    disabled={loading}
-                    className={`w-full text-right rounded-lg px-3 py-2 transition-colors ${
-                      i === greetingIndex
-                        ? 'bg-yellow-400/40 border border-yellow-400 text-white'
-                        : 'bg-white/10 hover:bg-white/20 text-white/80'
-                    }`}
-                  >
-                    <span className="font-bold text-sm">{i + 1}. {g.playerName}</span>
-                    <span className="text-xs text-white/60 mr-2">— {g.text.slice(0, 40)}{g.text.length > 40 ? '...' : ''}</span>
-                  </button>
-                ))}
+              <div className="space-y-1 max-h-40 overflow-y-auto">
+                {greetingAnswers.map((g, i) => {
+                  const ans = answers[i];
+                  const scored = ans && (ans.base_score ?? 0) > 0;
+                  return (
+                    <button
+                      key={g.id}
+                      onClick={() => doAction('greeting_goto', { index: i })}
+                      disabled={loading}
+                      className={`w-full text-right rounded-lg px-3 py-2 transition-colors ${
+                        i === greetingIndex
+                          ? 'bg-yellow-400/40 border border-yellow-400 text-white'
+                          : 'bg-white/10 hover:bg-white/20 text-white/80'
+                      }`}
+                    >
+                      <span className="font-bold text-sm">{i + 1}. {g.playerName}</span>
+                      {scored && <span className="text-yellow-300 text-xs mr-2">★{Math.round((ans.base_score ?? 0) / 100)}</span>}
+                    </button>
+                  );
+                })}
               </div>
             )}
+
+            {/* Show leaderboard when all greetings are done */}
+            <button onClick={() => doAction('show_leaderboard')} disabled={loading}
+              className="w-full bg-purple-500/60 hover:bg-purple-600/60 disabled:opacity-50 text-white font-bold py-3 rounded-xl">
+              סיים סרטונים → הצג דירוג
+            </button>
           </div>
         )}
 
@@ -436,7 +493,9 @@ export default function AdminScreen({ params }: PageProps) {
               {currentQuestion.question_type === 'free_text_greeting'
                 ? 'כתבו ברכה לאביה!'
                 : currentQuestion.question_type === 'drawing_contest'
-                ? "Draw Aviya's father!"
+                ? '🎨 ציור חופשי'
+                : currentQuestion.question_type === 'ai_image_contest'
+                ? '🤖 תמונת AI של אביה'
                 : currentQuestion.question_text}
             </p>
             <p className="text-green-300 mt-2">תשובה נכונה: {currentQuestion.correct_answer}</p>
@@ -445,7 +504,7 @@ export default function AdminScreen({ params }: PageProps) {
         )}
 
         {/* Answers */}
-        {answers.length > 0 && !isGreetingQuestion && !isDrawingQuestion && (
+        {answers.length > 0 && !isGreetingQuestion && !isImageQuestion && (
           <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4">
             <h2 className="text-white font-bold text-lg mb-2">תשובות שחקנים</h2>
             <div className="space-y-2 max-h-48 overflow-y-auto">

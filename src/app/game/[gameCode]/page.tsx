@@ -96,6 +96,7 @@ export default function GameScreen({ params }: PageProps) {
   // Compute active greeting state (needed before polling useEffect so deps are in scope)
   const isGreetingQuestion = currentQuestion?.question_type === 'free_text_greeting';
   const isDrawingQuestion = currentQuestion?.question_type === 'drawing_contest';
+  const isImageContestQuestion = currentQuestion?.question_type === 'ai_image_contest';
   const greetingIndex = game?.greeting_index ?? -1;
 
   const sortedGreetingAnswers = isGreetingQuestion
@@ -241,6 +242,13 @@ export default function GameScreen({ params }: PageProps) {
                 <p className="text-white text-3xl font-bold">{answers.length} / {players.length} שלחו ציור</p>
               </div>
             </div>
+          ) : isImageContestQuestion ? (
+            <div className="flex-1 flex flex-col items-center justify-center gap-6">
+              <p className="text-white text-5xl font-bold text-center">🤖 צרו תמונת AI של אביה</p>
+              <div className="bg-white/20 backdrop-blur-sm rounded-2xl p-6 text-center">
+                <p className="text-white text-3xl font-bold">{answers.length} / {players.length} סיימו</p>
+              </div>
+            </div>
           ) : (
             <>
               <div className="bg-white/20 backdrop-blur-sm rounded-3xl p-8 w-full max-w-4xl text-center">
@@ -300,12 +308,61 @@ export default function GameScreen({ params }: PageProps) {
                 </>
               )}
             </div>
+          ) : isImageContestQuestion ? (
+            // AI image contest carousel — same structure as drawing
+            <div className="flex-1 flex flex-col items-center justify-center w-full gap-6">
+              {greetingIndex < 0 || !activeDrawingAnswer ? (
+                <div className="text-center">
+                  <p className="text-5xl mb-4">🤖</p>
+                  <p className="text-pink-200 text-2xl animate-pulse">ממתינים לתמונה הבאה...</p>
+                </div>
+              ) : greetingIndex >= sortedDrawingAnswers.length ? (
+                <div className="text-center">
+                  <p className="text-5xl mb-4">🏆</p>
+                  <p className="text-white text-2xl">כל התמונות נוקדו!</p>
+                </div>
+              ) : (
+                <>
+                  <div className="text-center">
+                    <p className="text-pink-200 text-lg">{greetingIndex + 1} / {sortedDrawingAnswers.length}</p>
+                    <p className="text-white text-3xl font-bold mt-1">{activeDrawingPlayerName}</p>
+                  </div>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    key={activeDrawingAnswer.id}
+                    src={activeDrawingAnswer.answer_value}
+                    alt="תמונת AI"
+                    className="w-full max-w-lg rounded-2xl object-contain bg-white"
+                    style={{ maxHeight: '50vh' }}
+                  />
+                  {activeDrawingScored && (
+                    <div className="bg-yellow-400/30 border-2 border-yellow-400 rounded-2xl px-8 py-4 text-center">
+                      <p className="text-yellow-200 text-lg">ניקוד</p>
+                      <p className="text-white text-6xl font-bold">
+                        {activeDrawingScore}<span className="text-3xl text-yellow-200">/10</span>
+                      </p>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
           ) : isGreetingQuestion ? (
             <div className="flex-1 flex flex-col items-center justify-center w-full gap-6">
-              {!activeGreeting ? (
+              {!activeGreeting || !activeGreeting.videoUrl ? (
                 <div className="text-center">
-                  <p className="text-5xl mb-4">💌</p>
-                  <p className="text-pink-200 text-2xl animate-pulse">ממתינים לברכה הבאה...</p>
+                  {activeGreeting?.predictionId && !activeGreeting.videoUrl ? (
+                    <>
+                      <p className="text-white text-3xl font-bold mt-1">{activeGreeting.playerName}</p>
+                      <div className="flex items-center gap-3 text-yellow-300 text-xl animate-pulse mt-4">
+                        <span>🎬</span><span>הוידאו מוכן בקרוב...</span>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-5xl mb-4">🎬</p>
+                      <p className="text-pink-200 text-2xl animate-pulse">ממתינים לסרטון הבא...</p>
+                    </>
+                  )}
                 </div>
               ) : (
                 <>
@@ -313,32 +370,14 @@ export default function GameScreen({ params }: PageProps) {
                     <p className="text-pink-200 text-lg">{greetingIndex + 1} / {sortedGreetingAnswers.length}</p>
                     <p className="text-white text-3xl font-bold mt-1">{activeGreeting.playerName}</p>
                   </div>
-                  <p className="text-white text-2xl leading-relaxed italic text-center px-4" dir="rtl">
-                    &ldquo;{activeGreeting.text}&rdquo;
-                  </p>
-                  {activeGreeting.videoUrl ? (
-                    // eslint-disable-next-line jsx-a11y/media-has-caption
-                    <video
-                      key={activeGreeting.videoUrl}
-                      src={activeGreeting.videoUrl}
-                      autoPlay
-                      playsInline
-                      className="w-full rounded-2xl max-h-96 bg-black"
-                    />
-                  ) : activeGreeting.predictionId ? (
-                    <div className="flex items-center gap-3 text-yellow-300 text-xl animate-pulse">
-                      <span>🎬</span><span>הוידאו מוכן בקרוב...</span>
-                    </div>
-                  ) : (
-                    // eslint-disable-next-line jsx-a11y/media-has-caption
-                    <audio
-                      key={`${activeAnswer?.id}-${activeGreeting.voice}`}
-                      src={`/api/tts?text=${encodeURIComponent(activeGreeting.text)}&voice=${encodeURIComponent(activeGreeting.voice)}`}
-                      autoPlay
-                      preload="auto"
-                      className="hidden"
-                    />
-                  )}
+                  {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+                  <video
+                    key={activeGreeting.videoUrl}
+                    src={activeGreeting.videoUrl}
+                    autoPlay
+                    playsInline
+                    className="w-full rounded-2xl max-h-[60vh] bg-black"
+                  />
                 </>
               )}
             </div>
