@@ -96,6 +96,7 @@ export default function AdminScreen({ params }: PageProps) {
       setMessage(data.error || 'שגיאה');
     } else {
       setMessage('');
+      await loadData(); // force-refresh in case realtime subscription lags
     }
   };
 
