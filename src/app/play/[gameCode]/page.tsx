@@ -293,8 +293,6 @@ export default function PlayerScreen({ params }: PageProps) {
                 {[
                   { key: 'woman', emoji: '👩', label: 'אישה' },
                   { key: 'man',   emoji: '👨', label: 'גבר' },
-                  { key: 'child', emoji: '👦', label: 'ילד' },
-                  { key: 'uncle', emoji: '👴', label: 'דוד' },
                 ].map(v => (
                   <button
                     key={v.key}
