@@ -33,6 +33,11 @@ export async function POST(request: NextRequest) {
       .order('question_order');
 
     switch (action) {
+      case 'ping': {
+        // Auth-only check — does not modify any game state
+        return NextResponse.json({ success: true });
+      }
+
       case 'start_game': {
         await supabase
           .from('games')

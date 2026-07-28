@@ -82,21 +82,26 @@ export default function AdminScreen({ params }: PageProps) {
   const doAction = async (action: string, extra?: Record<string, unknown>) => {
     setLoading(true);
     setMessage('');
-    const res = await fetch('/api/admin', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-admin-password': adminPassword,
-      },
-      body: JSON.stringify({ action, gameCode, ...extra }),
-    });
-    const data = await res.json();
-    setLoading(false);
-    if (!res.ok) {
-      setMessage(data.error || 'שגיאה');
-    } else {
-      setMessage('');
-      await loadData(); // force-refresh in case realtime subscription lags
+    try {
+      const res = await fetch('/api/admin', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-password': adminPassword,
+        },
+        body: JSON.stringify({ action, gameCode, ...extra }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setMessage(data.error || 'שגיאה');
+      } else {
+        setMessage('');
+        await loadData();
+      }
+    } catch {
+      setMessage('שגיאת רשת — נסה שוב');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -108,7 +113,7 @@ export default function AdminScreen({ params }: PageProps) {
         'Content-Type': 'application/json',
         'x-admin-password': passwordInput,
       },
-      body: JSON.stringify({ action: 'start_game', gameCode }),
+      body: JSON.stringify({ action: 'ping', gameCode }),
     });
     if (res.status === 401) {
       setAuthError('סיסמה שגויה');
