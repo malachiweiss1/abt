@@ -233,11 +233,8 @@ export default function GameScreen({ params }: PageProps) {
         <div className="flex-1 flex flex-col items-center gap-8">
           {isDrawingQuestion ? (
             <div className="flex-1 flex flex-col items-center gap-6">
-              <div className="bg-white/20 backdrop-blur-sm rounded-3xl p-6 text-center w-full max-w-2xl">
-                <p className="text-pink-200 text-xl mb-2">Draw Aviya's father!</p>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/aviya.png" alt="תמונת עזר" className="mx-auto max-h-96 rounded-2xl object-contain" />
-              </div>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/aviya.png" alt="תמונת עזר" className="mx-auto max-h-[70vh] rounded-2xl object-contain" />
               <div className="bg-white/20 backdrop-blur-sm rounded-2xl p-6 text-center">
                 <p className="text-white text-3xl font-bold">{answers.length} / {players.length} שלחו ציור</p>
               </div>
