@@ -291,9 +291,10 @@ export default function PlayerScreen({ params }: PageProps) {
               <p className="text-pink-200 text-sm text-center">בחרו קול לברכה:</p>
               <div className="grid grid-cols-2 gap-2">
                 {[
-                  { key: 'woman',    emoji: '👩', label: 'אישה' },
+                  { key: 'woman', emoji: '👩', label: 'אישה' },
                   { key: 'man',   emoji: '👨', label: 'גבר' },
                   { key: 'child', emoji: '👦', label: 'ילד' },
+                  { key: 'uncle', emoji: '👴', label: 'דוד' },
                 ].map(v => (
                   <button
                     key={v.key}
