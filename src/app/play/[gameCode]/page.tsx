@@ -255,7 +255,9 @@ export default function PlayerScreen({ params }: PageProps) {
       <div className="min-h-screen p-4 flex flex-col" dir="rtl">
         <div className="bg-white/20 backdrop-blur-sm rounded-2xl p-6 mb-6 text-center">
           <p className="text-pink-200 text-sm mb-1">שאלה {currentQuestion.question_order}</p>
-          <h2 className="text-2xl font-bold text-white" dir="rtl">{currentQuestion.question_text}</h2>
+          <h2 className="text-2xl font-bold text-white">
+            {isGreeting ? 'כתבו ברכה לאביה!' : currentQuestion.question_text}
+          </h2>
         </div>
 
         {submitted ? (
@@ -290,9 +292,8 @@ export default function PlayerScreen({ params }: PageProps) {
               <div className="grid grid-cols-2 gap-2">
                 {[
                   { key: 'woman',    emoji: '👩', label: 'אישה' },
-                  { key: 'man',      emoji: '👨', label: 'גבר' },
-                  { key: 'child',    emoji: '👦', label: 'ילד' },
-                  { key: 'announcer',emoji: '📣', label: 'קריין כדורגל' },
+                  { key: 'man',   emoji: '👨', label: 'גבר' },
+                  { key: 'child', emoji: '👦', label: 'ילד' },
                 ].map(v => (
                   <button
                     key={v.key}
