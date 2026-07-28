@@ -105,8 +105,8 @@ export default function GameScreen({ params }: PageProps) {
 
   const activeAnswer = greetingIndex >= 0 ? (sortedGreetingAnswers[greetingIndex] ?? null) : null;
 
-  // Drawing contest computed vars
-  const sortedDrawingAnswers = isDrawingQuestion
+  // Drawing / AI image contest computed vars
+  const sortedDrawingAnswers = (isDrawingQuestion || isImageContestQuestion)
     ? [...answers].sort((a, b) => new Date(a.submitted_at).getTime() - new Date(b.submitted_at).getTime())
     : [];
 

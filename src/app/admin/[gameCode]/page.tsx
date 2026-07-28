@@ -181,8 +181,8 @@ export default function AdminScreen({ params }: PageProps) {
       })
     : [];
 
-  // Drawing contest computed vars
-  const drawingAnswers = isDrawingQuestion
+  // Drawing / AI image contest computed vars
+  const drawingAnswers = isImageQuestion
     ? answers.map(a => ({
         id: a.id,
         playerId: a.player_id,

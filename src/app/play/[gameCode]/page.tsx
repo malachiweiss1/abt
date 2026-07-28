@@ -32,11 +32,12 @@ export default function PlayerScreen({ params }: PageProps) {
 
   // AI image contest state
   const [imagePrompt, setImagePrompt] = useState('');
-  const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
-  const [refineCount, setRefineCount] = useState(0);
+  const [imageHistory, setImageHistory] = useState<string[]>([]); // all generated images
+  const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null); // chosen to submit
   const [imageGenerating, setImageGenerating] = useState(false);
   const [imageApproved, setImageApproved] = useState(false);
   const MAX_REFINEMENTS = 5;
+  const generatedImageUrl = imageHistory[imageHistory.length - 1] ?? null;
 
   const playerRef = useRef<Player | null>(null);
   const currentQuestionRef = useRef<Question | null>(null);
@@ -72,8 +73,8 @@ export default function PlayerScreen({ params }: PageProps) {
         setGreetingText('');
         setDrawingSubmitted(false);
         setImagePrompt('');
-        setGeneratedImageUrl(null);
-        setRefineCount(0);
+        setImageHistory([]);
+        setSelectedImageUrl(null);
         setImageApproved(false);
         setImageGenerating(false);
       }
@@ -242,15 +243,15 @@ export default function PlayerScreen({ params }: PageProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           prompt: refinementPrompt || imagePrompt,
-          currentImageUrl: refinementPrompt ? generatedImageUrl : null,
+          currentImageUrl: refinementPrompt ? (selectedImageUrl ?? generatedImageUrl) : null,
         }),
       });
       const data = await res.json();
       if (!res.ok || !data.imageUrl) {
         setError(data.error || 'שגיאה ביצירת תמונה');
       } else {
-        setGeneratedImageUrl(data.imageUrl);
-        if (refinementPrompt) setRefineCount(c => c + 1);
+        setImageHistory(prev => [...prev, data.imageUrl]);
+        setSelectedImageUrl(data.imageUrl); // default select the newest
       }
     } catch {
       setError('שגיאת רשת — נסה שוב');
@@ -367,16 +368,16 @@ export default function PlayerScreen({ params }: PageProps) {
               <div className="text-center space-y-4">
                 <div className="text-5xl">🤖</div>
                 <p className="text-white text-2xl font-bold">התמונה אושרה!</p>
-                {generatedImageUrl && (
+                {selectedImageUrl && (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={generatedImageUrl} alt="תמונה שנוצרה" className="w-48 h-48 object-cover rounded-2xl mx-auto border-2 border-pink-400" />
+                  <img src={selectedImageUrl} alt="תמונה שנוצרה" className="w-48 h-48 object-cover rounded-2xl mx-auto border-2 border-pink-400" />
                 )}
                 <p className="text-pink-200">ממתין לשאר השחקנים...</p>
               </div>
             </div>
           ) : (
-            <div className="flex-1 flex flex-col gap-4">
-              {!generatedImageUrl ? (
+            <div className="flex-1 flex flex-col gap-4 overflow-y-auto">
+              {imageHistory.length === 0 ? (
                 // Initial prompt input
                 <>
                   <p className="text-pink-200 text-sm text-center">תארו את אביה — לדוגמה: אביה, מלכה עם כתר ופרחים</p>
@@ -403,23 +404,50 @@ export default function PlayerScreen({ params }: PageProps) {
                   {error && <p className="text-red-300 text-center">{error}</p>}
                 </>
               ) : (
-                // Show generated image + approve/refine options
                 <>
+                  {/* Currently selected image (large) */}
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src={generatedImageUrl}
-                    alt="תמונה שנוצרה"
-                    className="w-full rounded-2xl object-contain max-h-64 bg-white/10"
+                    src={selectedImageUrl ?? generatedImageUrl ?? ''}
+                    alt="תמונה נבחרת"
+                    className="w-full rounded-2xl object-contain max-h-56 bg-white/10"
                   />
-                  <p className="text-pink-200 text-sm text-center">
-                    {refineCount > 0 ? `תיקון ${refineCount}/${MAX_REFINEMENTS}` : 'תמונה ראשונה'}
+
+                  {/* History thumbnails — click to select */}
+                  {imageHistory.length > 1 && (
+                    <div className="space-y-1">
+                      <p className="text-pink-200 text-xs text-center">בחרו תמונה לשליחה:</p>
+                      <div className="flex gap-2 overflow-x-auto pb-1">
+                        {imageHistory.map((url, i) => (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            key={url}
+                            src={url}
+                            alt={`תמונה ${i + 1}`}
+                            onClick={() => setSelectedImageUrl(url)}
+                            className={`h-16 w-16 flex-shrink-0 rounded-xl object-cover cursor-pointer border-2 transition-all ${
+                              selectedImageUrl === url
+                                ? 'border-yellow-400 scale-110'
+                                : 'border-white/30 opacity-70'
+                            }`}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <p className="text-pink-200 text-xs text-center">
+                    תמונה {imageHistory.indexOf(selectedImageUrl ?? '') + 1} מתוך {imageHistory.length}
+                    {imageHistory.length < MAX_REFINEMENTS + 1 && ` · נותרו ${MAX_REFINEMENTS + 1 - imageHistory.length} תיקונים`}
                   </p>
 
                   {/* Approve button */}
                   <button
                     onClick={async () => {
+                      const toSubmit = selectedImageUrl ?? generatedImageUrl;
+                      if (!toSubmit) return;
                       setImageApproved(true);
-                      await handleSubmit(generatedImageUrl);
+                      await handleSubmit(toSubmit);
                     }}
                     disabled={submitting || imageGenerating}
                     className="w-full bg-green-500 hover:bg-green-600 disabled:opacity-50 text-white font-bold py-4 rounded-2xl text-xl"
@@ -427,8 +455,8 @@ export default function PlayerScreen({ params }: PageProps) {
                     {submitting ? 'שולח...' : '✓ אשר תמונה'}
                   </button>
 
-                  {/* Refine option — up to MAX_REFINEMENTS times */}
-                  {refineCount < MAX_REFINEMENTS && !imageGenerating && (
+                  {/* Refine option */}
+                  {imageHistory.length <= MAX_REFINEMENTS && !imageGenerating && (
                     <RefinementInput
                       disabled={imageGenerating || submitting}
                       onRefine={(refinementText) => handleGenerateImage(refinementText)}
