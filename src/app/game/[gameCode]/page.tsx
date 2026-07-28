@@ -154,7 +154,7 @@ export default function GameScreen({ params }: PageProps) {
         <div className="flex-1 flex flex-col items-center gap-8">
           <div className="bg-white/20 backdrop-blur-sm rounded-3xl p-8 w-full max-w-4xl text-center">
             <p className="text-pink-200 text-xl mb-2">שאלה {currentQuestion.question_order}</p>
-            <h2 className="text-4xl font-bold text-white">{currentQuestion.question_text}</h2>
+            <h2 className="text-4xl font-bold text-white" dir="rtl">{currentQuestion.question_text}</h2>
           </div>
 
           <div className="bg-white/20 backdrop-blur-sm rounded-2xl p-6 text-center">
