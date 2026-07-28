@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
     }
 
     const response = await openai.images.edit({
-      model: 'gpt-image-1',
+      model: 'gpt-image-2',
       image: imageFile,
       prompt: prompt.trim(),
       n: 1,
