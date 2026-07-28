@@ -24,6 +24,9 @@ export default function PlayerScreen({ params }: PageProps) {
   const [error, setError] = useState<string | null>(null);
   const [greetingText, setGreetingText] = useState('');
   const [voiceType, setVoiceType] = useState('woman');
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [videoStatus, setVideoStatus] = useState<'idle' | 'starting' | 'generating' | 'done' | 'error'>('idle');
   const playerRef = useRef<Player | null>(null);
   const currentQuestionRef = useRef<Question | null>(null);
 
@@ -192,6 +195,26 @@ export default function PlayerScreen({ params }: PageProps) {
 
     setSubmitted(true);
     setMyAnswer({ isCorrect: data.isCorrect, answerValue: value! });
+
+    // If greeting with photo, start video generation
+    if (currentQuestion.question_type === 'free_text_greeting' && photoFile && data.answer?.id) {
+      setVideoStatus('starting');
+      try {
+        const fd = new FormData();
+        fd.append('image', photoFile);
+        fd.append('answerId', data.answer.id);
+        fd.append('text', greetingText);
+        fd.append('voice', voiceType);
+        const vRes = await fetch('/api/start-video', { method: 'POST', body: fd });
+        if (vRes.ok) {
+          setVideoStatus('generating');
+        } else {
+          setVideoStatus('error');
+        }
+      } catch {
+        setVideoStatus('error');
+      }
+    }
   };
 
   function parseGreetingText(value: string): string {
@@ -270,6 +293,9 @@ export default function PlayerScreen({ params }: PageProps) {
               {isGreeting && myAnswer && (
                 <p className="text-pink-200 text-lg italic">"{parseGreetingText(myAnswer.answerValue)}"</p>
               )}
+              {videoStatus === 'starting' && <p className="text-yellow-300 text-sm animate-pulse">מכין את הוידאו שלך...</p>}
+              {videoStatus === 'generating' && <p className="text-green-300 text-sm animate-pulse">✨ הוידאו שלך בדרך!</p>}
+              {videoStatus === 'error' && <p className="text-orange-300 text-sm">הוידאו לא הצליח, הברכה תושמע כקול</p>}
               <p className="text-pink-200">ממתין לשאר השחקנים...</p>
             </div>
           </div>
@@ -280,7 +306,7 @@ export default function PlayerScreen({ params }: PageProps) {
               placeholder="כתבו ברכה לאביה..."
               value={greetingText}
               onChange={e => setGreetingText(e.target.value)}
-              rows={4}
+              rows={3}
               className="w-full bg-white/20 text-white placeholder-white/60 rounded-2xl p-4 text-lg border border-white/30 focus:outline-none focus:border-white resize-none"
               maxLength={300}
             />
@@ -308,6 +334,39 @@ export default function PlayerScreen({ params }: PageProps) {
                   </button>
                 ))}
               </div>
+            </div>
+
+            {/* Photo upload */}
+            <div className="space-y-2">
+              <p className="text-pink-200 text-sm text-center">📸 העלו תמונת פנים (אופציונלי — ליצירת וידאו)</p>
+              {photoPreview ? (
+                <div className="relative flex justify-center">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={photoPreview} alt="תצוגה מקדימה" className="h-32 w-32 object-cover rounded-2xl border-2 border-pink-400" />
+                  <button
+                    onClick={() => { setPhotoFile(null); setPhotoPreview(null); }}
+                    className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-6 h-6 text-xs flex items-center justify-center"
+                  >✕</button>
+                </div>
+              ) : (
+                <label className="flex flex-col items-center gap-2 bg-white/10 border border-dashed border-white/40 rounded-2xl p-4 cursor-pointer hover:bg-white/20 transition-colors">
+                  <span className="text-3xl">📷</span>
+                  <span className="text-white/70 text-sm">לחצו לצילום או העלאת תמונה</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    capture="user"
+                    className="hidden"
+                    onChange={e => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        setPhotoFile(file);
+                        setPhotoPreview(URL.createObjectURL(file));
+                      }
+                    }}
+                  />
+                </label>
+              )}
             </div>
 
             <button

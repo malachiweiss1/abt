@@ -177,14 +177,24 @@ export default function GameScreen({ params }: PageProps) {
                 greetings={answers.map(a => {
                   let text = a.answer_value;
                   let voice = 'woman';
+                  let predictionId: string | undefined;
+                  let videoUrl: string | undefined;
                   try {
                     const parsed = JSON.parse(a.answer_value);
-                    if (parsed?.text) { text = parsed.text; voice = parsed.voice || 'woman'; }
+                    if (parsed?.text) {
+                      text = parsed.text;
+                      voice = parsed.voice || 'woman';
+                      predictionId = parsed.prediction_id;
+                      videoUrl = parsed.video_url;
+                    }
                   } catch { /* plain text greeting */ }
                   return {
                     playerName: players.find(p => p.id === a.player_id)?.display_name ?? '?',
                     text,
                     voice,
+                    answerId: a.id,
+                    predictionId,
+                    videoUrl,
                   };
                 })}
               />

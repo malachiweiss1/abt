@@ -6,6 +6,9 @@ interface Greeting {
   playerName: string;
   text: string;
   voice?: string;
+  answerId?: string;
+  predictionId?: string;
+  videoUrl?: string;
 }
 
 interface GreetingPlayerProps {
@@ -19,10 +22,16 @@ const VOICE_META: Record<string, { emoji: string; label: string; pitch: number; 
 };
 
 export default function GreetingPlayer({ greetings }: GreetingPlayerProps) {
+  // Video URLs resolved from polling, keyed by answerId
+  const [resolvedVideos, setResolvedVideos] = useState<Record<string, string>>({});
+  const [pendingStatus, setPendingStatus] = useState<Record<string, 'polling' | 'failed'>>({});
+
+  // Browser TTS state
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [playingIndex, setPlayingIndex] = useState<number | null>(null);
   const [isPlayingAll, setIsPlayingAll] = useState(false);
   const stopFlag = useRef(false);
+  const pollingRefs = useRef<Record<string, ReturnType<typeof setInterval>>>({});
 
   useEffect(() => {
     if (typeof window === 'undefined' || !window.speechSynthesis) return;
@@ -32,20 +41,45 @@ export default function GreetingPlayer({ greetings }: GreetingPlayerProps) {
     return () => window.speechSynthesis.removeEventListener('voiceschanged', load);
   }, []);
 
+  // Poll for pending predictions
+  useEffect(() => {
+    greetings.forEach(g => {
+      if (!g.predictionId || !g.answerId) return;
+      if (g.videoUrl || resolvedVideos[g.answerId]) return; // already done
+      if (pollingRefs.current[g.answerId]) return; // already polling
+
+      setPendingStatus(prev => ({ ...prev, [g.answerId!]: 'polling' }));
+
+      pollingRefs.current[g.answerId] = setInterval(async () => {
+        try {
+          const res = await fetch(`/api/video-status?predictionId=${g.predictionId}&answerId=${g.answerId}`);
+          const data = await res.json();
+          if (data.status === 'done' && data.video_url) {
+            setResolvedVideos(prev => ({ ...prev, [g.answerId!]: data.video_url }));
+            setPendingStatus(prev => { const n = { ...prev }; delete n[g.answerId!]; return n; });
+            clearInterval(pollingRefs.current[g.answerId!]);
+            delete pollingRefs.current[g.answerId!];
+          } else if (data.status === 'failed') {
+            setPendingStatus(prev => ({ ...prev, [g.answerId!]: 'failed' }));
+            clearInterval(pollingRefs.current[g.answerId!]);
+            delete pollingRefs.current[g.answerId!];
+          }
+        } catch { /* ignore poll errors */ }
+      }, 5000);
+    });
+
+    return () => {
+      Object.values(pollingRefs.current).forEach(clearInterval);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [greetings]);
+
   const getBestVoice = (voiceType: string) => {
     const heVoices = voices.filter(v => v.lang.startsWith('he'));
     if (voiceType === 'man') {
-      return (
-        heVoices.find(v => /avri|male|aviv/i.test(v.name)) ||
-        heVoices[heVoices.length - 1] ||
-        null
-      );
+      return heVoices.find(v => /avri|male/i.test(v.name)) || heVoices[heVoices.length - 1] || null;
     }
-    return (
-      heVoices.find(v => /hila|female/i.test(v.name)) ||
-      heVoices[0] ||
-      null
-    );
+    return heVoices.find(v => /hila|female/i.test(v.name)) || heVoices[0] || null;
   };
 
   const speakOne = (text: string, voiceType: string, index: number): Promise<void> =>
@@ -64,14 +98,18 @@ export default function GreetingPlayer({ greetings }: GreetingPlayerProps) {
       window.speechSynthesis.speak(utt);
     });
 
-  const playAll = async () => {
+  const playAllAudio = async () => {
     stopFlag.current = false;
     setIsPlayingAll(true);
     for (let i = 0; i < greetings.length; i++) {
       if (stopFlag.current) break;
       const g = greetings[i];
-      await speakOne(g.text, g.voice || 'woman', i);
-      if (!stopFlag.current) await new Promise(r => setTimeout(r, 700));
+      const vid = g.videoUrl || (g.answerId ? resolvedVideos[g.answerId] : undefined);
+      if (!vid) {
+        // Only speak audio for greetings without video
+        await speakOne(g.text, g.voice || 'woman', i);
+        if (!stopFlag.current) await new Promise(r => setTimeout(r, 700));
+      }
     }
     setIsPlayingAll(false);
     setPlayingIndex(null);
@@ -88,52 +126,76 @@ export default function GreetingPlayer({ greetings }: GreetingPlayerProps) {
     return <p className="text-pink-200 text-center">אין ברכות עדיין...</p>;
   }
 
+  const hasAudioOnly = greetings.some(g => {
+    const vid = g.videoUrl || (g.answerId ? resolvedVideos[g.answerId] : undefined);
+    return !vid;
+  });
+
   return (
     <div className="space-y-4 w-full">
-      {/* Controls */}
-      <div className="flex gap-3">
-        <button
-          onClick={isPlayingAll ? stopAll : playAll}
-          className={`flex-1 font-bold py-3 rounded-xl text-lg transition-colors ${
-            isPlayingAll
-              ? 'bg-red-500 hover:bg-red-600 text-white'
-              : 'bg-green-500 hover:bg-green-600 text-white'
-          }`}
-        >
-          {isPlayingAll ? '■ עצור' : '▶ השמע את כולם'}
-        </button>
-      </div>
+      {hasAudioOnly && (
+        <div className="flex gap-3">
+          <button
+            onClick={isPlayingAll ? stopAll : playAllAudio}
+            className={`flex-1 font-bold py-3 rounded-xl text-lg transition-colors ${
+              isPlayingAll ? 'bg-red-500 hover:bg-red-600 text-white' : 'bg-green-500 hover:bg-green-600 text-white'
+            }`}
+          >
+            {isPlayingAll ? '■ עצור' : '▶ השמע ברכות קוליות'}
+          </button>
+        </div>
+      )}
 
-      {/* Individual greetings */}
-      <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
+      <div className="space-y-4 max-h-[65vh] overflow-y-auto pr-1">
         {greetings.map((g, i) => {
           const voiceType = g.voice || 'woman';
           const meta = VOICE_META[voiceType] || VOICE_META.woman;
+          const videoUrl = g.videoUrl || (g.answerId ? resolvedVideos[g.answerId] : undefined);
+          const status = g.answerId ? pendingStatus[g.answerId] : undefined;
           const isActive = playingIndex === i;
+
           return (
             <div
               key={i}
-              className={`rounded-2xl p-4 flex items-start gap-3 transition-all ${
-                isActive
-                  ? 'bg-yellow-400/30 border-2 border-yellow-400 scale-[1.01]'
-                  : 'bg-white/15 border border-white/10'
+              className={`rounded-2xl p-4 transition-all ${
+                isActive ? 'bg-yellow-400/30 border-2 border-yellow-400' : 'bg-white/15 border border-white/10'
               }`}
             >
-              <div className="flex-1" dir="rtl">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-lg">{meta.emoji}</span>
-                  <p className="text-pink-200 text-sm font-semibold">{g.playerName}</p>
-                  <span className="text-white/40 text-xs">({meta.label})</span>
-                </div>
-                <p className="text-white text-lg leading-snug italic">"{g.text}"</p>
+              <div className="flex items-center gap-2 mb-2" dir="rtl">
+                <span className="text-lg">{meta.emoji}</span>
+                <p className="text-pink-200 text-sm font-semibold">{g.playerName}</p>
               </div>
-              <button
-                onClick={() => isActive ? stopAll() : speakOne(g.text, voiceType, i)}
-                disabled={isPlayingAll && !isActive}
-                className="shrink-0 bg-purple-500 hover:bg-purple-600 disabled:opacity-40 text-white rounded-xl px-3 py-2 text-xl"
-              >
-                {isActive ? '■' : '▶'}
-              </button>
+              <p className="text-white text-base leading-snug italic mb-3" dir="rtl">"{g.text}"</p>
+
+              {videoUrl ? (
+                // eslint-disable-next-line jsx-a11y/media-has-caption
+                <video
+                  src={videoUrl}
+                  controls
+                  playsInline
+                  className="w-full rounded-xl max-h-64 bg-black"
+                />
+              ) : status === 'polling' ? (
+                <div className="flex items-center gap-2 text-yellow-300 text-sm animate-pulse">
+                  <span>🎬</span><span>הוידאו מוכן בקרוב...</span>
+                </div>
+              ) : status === 'failed' ? (
+                <button
+                  onClick={() => isActive ? stopAll() : speakOne(g.text, voiceType, i)}
+                  disabled={isPlayingAll && !isActive}
+                  className="bg-purple-500 hover:bg-purple-600 disabled:opacity-40 text-white rounded-xl px-4 py-2 text-lg"
+                >
+                  {isActive ? '■' : '▶ השמע'}
+                </button>
+              ) : (
+                <button
+                  onClick={() => isActive ? stopAll() : speakOne(g.text, voiceType, i)}
+                  disabled={isPlayingAll && !isActive}
+                  className="bg-purple-500 hover:bg-purple-600 disabled:opacity-40 text-white rounded-xl px-4 py-2 text-lg"
+                >
+                  {isActive ? '■' : '▶ השמע'}
+                </button>
+              )}
             </div>
           );
         })}
