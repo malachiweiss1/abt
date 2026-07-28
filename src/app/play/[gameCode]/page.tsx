@@ -2,6 +2,7 @@
 
 import { use, useState, useEffect, useCallback, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import DrawingCanvas from '@/components/DrawingCanvas';
 import type { Game, Question, Player } from '@/types';
 
 const STORAGE_KEY = 'birthday_quiz_player';
@@ -24,6 +25,7 @@ export default function PlayerScreen({ params }: PageProps) {
   const [error, setError] = useState<string | null>(null);
   const [greetingText, setGreetingText] = useState('');
   const [voiceType, setVoiceType] = useState('woman');
+  const [drawingSubmitted, setDrawingSubmitted] = useState(false);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [videoStatus, setVideoStatus] = useState<'idle' | 'starting' | 'generating' | 'done' | 'error'>('idle');
@@ -59,6 +61,7 @@ export default function PlayerScreen({ params }: PageProps) {
         setSubmitted(false);
         setMyAnswer(null);
         setGreetingText('');
+        setDrawingSubmitted(false);
       }
 
       // Check if this player already answered
@@ -273,17 +276,45 @@ export default function PlayerScreen({ params }: PageProps) {
   // QUESTION ACTIVE
   if (game.status === 'question_active' && currentQuestion) {
     const isGreeting = currentQuestion.question_type === 'free_text_greeting';
+    const isDrawing = currentQuestion.question_type === 'drawing_contest';
 
     return (
       <div className="min-h-screen p-4 flex flex-col" dir="rtl">
         <div className="bg-white/20 backdrop-blur-sm rounded-2xl p-6 mb-6 text-center">
           <p className="text-pink-200 text-sm mb-1">שאלה {currentQuestion.question_order}</p>
           <h2 className="text-2xl font-bold text-white">
-            {isGreeting ? 'כתבו ברכה לאביה!' : currentQuestion.question_text}
+            {isGreeting ? 'כתבו ברכה לאביה!' : isDrawing ? 'תחרות ציורים!' : currentQuestion.question_text}
           </h2>
         </div>
 
-        {submitted ? (
+        {isDrawing ? (
+          submitted || drawingSubmitted ? (
+            <div className="flex-1 flex items-center justify-center">
+              <div className="text-center space-y-4">
+                <div className="text-5xl">🎨</div>
+                <p className="text-white text-2xl font-bold">הציור נשלח!</p>
+                <p className="text-pink-200">ממתין לשאר השחקנים...</p>
+              </div>
+            </div>
+          ) : (
+            <div className="flex-1 flex flex-col gap-4 overflow-hidden">
+              <DrawingCanvas
+                onSubmit={async (dataUrl) => {
+                  if (!player || !currentQuestion) return;
+                  const uploadRes = await fetch('/api/upload-drawing', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ dataUrl, answerId: `${player.id}-${currentQuestion.id}` }),
+                  });
+                  const uploadData = await uploadRes.json();
+                  if (!uploadData.url) throw new Error('Upload failed');
+                  await handleSubmit(uploadData.url);
+                  setDrawingSubmitted(true);
+                }}
+              />
+            </div>
+          )
+        ) : submitted ? (
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center space-y-4">
               <div className="text-5xl">{isGreeting ? '💌' : myAnswer?.isCorrect ? '✅' : '❌'}</div>
@@ -405,10 +436,17 @@ export default function PlayerScreen({ params }: PageProps) {
   // ANSWER REVEALED
   if (game.status === 'answer_revealed' && currentQuestion) {
     const isGreeting = currentQuestion.question_type === 'free_text_greeting';
+    const isDrawing = currentQuestion.question_type === 'drawing_contest';
     return (
       <div className="min-h-screen flex items-center justify-center p-4" dir="rtl">
         <div className="text-center space-y-6 max-w-sm w-full">
-          {isGreeting ? (
+          {isDrawing ? (
+            <>
+              <div className="text-6xl">🎨</div>
+              <h2 className="text-3xl font-bold text-white">הציורים מוצגים!</h2>
+              <p className="text-pink-200">הקשיבו למסך הגדול 🎨</p>
+            </>
+          ) : isGreeting ? (
             <>
               <div className="text-6xl">💌</div>
               <h2 className="text-3xl font-bold text-white">הברכות מושמעות!</h2>

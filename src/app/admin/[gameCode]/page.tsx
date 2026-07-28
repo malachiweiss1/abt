@@ -21,6 +21,7 @@ export default function AdminScreen({ params }: PageProps) {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
+  const [drawingScore, setDrawingScore] = useState<number | null>(null);
 
   const supabase = createClient();
 
@@ -153,13 +154,14 @@ export default function AdminScreen({ params }: PageProps) {
   const currentQuestionIndex = allQuestions.findIndex(q => q.id === game?.current_question_id);
   const isLastQuestion = currentQuestionIndex === allQuestions.length - 1;
   const isGreetingQuestion = currentQuestion?.question_type === 'free_text_greeting';
+  const isDrawingQuestion = currentQuestion?.question_type === 'drawing_contest';
   const greetingIndex = game?.greeting_index ?? -1;
 
   // Parse greeting answers for the controller list
   const greetingAnswers = isGreetingQuestion
     ? answers.map(a => {
         let text = a.answer_value;
-        let playerName = players.find(p => p.id === a.player_id)?.display_name ?? '?';
+        const playerName = players.find(p => p.id === a.player_id)?.display_name ?? '?';
         try {
           const parsed = JSON.parse(a.answer_value);
           if (parsed?.text) text = parsed.text;
@@ -167,6 +169,21 @@ export default function AdminScreen({ params }: PageProps) {
         return { id: a.id, playerName, text };
       })
     : [];
+
+  // Drawing contest computed vars
+  const drawingAnswers = isDrawingQuestion
+    ? answers.map(a => ({
+        id: a.id,
+        playerId: a.player_id,
+        playerName: players.find(p => p.id === a.player_id)?.display_name ?? '?',
+        imageUrl: a.answer_value,
+        scored: (a.base_score ?? 0) > 0,
+        scoreValue: Math.round((a.base_score ?? 0) / 100),
+      }))
+    : [];
+
+  const currentDrawing = greetingIndex >= 0 ? (drawingAnswers[greetingIndex] ?? null) : null;
+  const allDrawingsScored = drawingAnswers.length > 0 && drawingAnswers.every(d => d.scored);
 
   return (
     <div className="min-h-screen p-4" dir="rtl">
@@ -200,7 +217,7 @@ export default function AdminScreen({ params }: PageProps) {
             </button>
           )}
 
-          {game?.status === 'answer_revealed' && !isGreetingQuestion && (
+          {game?.status === 'answer_revealed' && !isGreetingQuestion && !isDrawingQuestion && (
             <button onClick={() => doAction('show_leaderboard')} disabled={loading}
               className="w-full bg-purple-500 hover:bg-purple-600 disabled:opacity-50 text-white font-bold py-4 rounded-xl text-lg">
               הצג דירוג
@@ -241,6 +258,105 @@ export default function AdminScreen({ params }: PageProps) {
             אפס שחקנים (כניסה מחדש)
           </button>
         </div>
+
+        {/* Drawing Controller */}
+        {isDrawingQuestion && game?.status === 'answer_revealed' && (
+          <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 space-y-4" dir="rtl">
+            <div className="flex items-center justify-between">
+              <h2 className="text-white font-bold text-lg">🎨 ניקוד ציורים</h2>
+              <span className="text-yellow-300 font-bold text-lg">
+                {greetingIndex < 0 ? 'טרם התחיל' : `${greetingIndex + 1} / ${drawingAnswers.length}`}
+              </span>
+            </div>
+
+            {greetingIndex < 0 ? (
+              <button
+                onClick={() => doAction('greeting_start')}
+                disabled={loading || drawingAnswers.length === 0}
+                className="w-full bg-green-500 hover:bg-green-600 disabled:opacity-50 text-white font-bold py-4 rounded-xl text-lg"
+              >
+                ▶ התחל סיור ציורים
+              </button>
+            ) : allDrawingsScored && greetingIndex >= drawingAnswers.length ? (
+              <div className="space-y-3">
+                <div className="text-center text-white text-xl">✅ כל הציורים נוקדו!</div>
+                <button
+                  onClick={() => doAction('show_leaderboard')}
+                  disabled={loading}
+                  className="w-full bg-purple-500 hover:bg-purple-600 disabled:opacity-50 text-white font-bold py-4 rounded-xl text-lg"
+                >
+                  הצג דירוג
+                </button>
+              </div>
+            ) : currentDrawing ? (
+              <div className="space-y-3">
+                <p className="text-white text-lg font-bold text-center">{currentDrawing.playerName}</p>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={currentDrawing.imageUrl}
+                  alt="ציור"
+                  className="w-full rounded-xl max-h-48 object-contain bg-white"
+                />
+
+                {currentDrawing.scored ? (
+                  <div className="space-y-3">
+                    <p className="text-yellow-300 text-center text-lg font-bold">ניקוד: {currentDrawing.scoreValue}/10</p>
+                    <button
+                      onClick={() => doAction('greeting_next')}
+                      disabled={loading}
+                      className="w-full bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white font-bold py-3 rounded-xl"
+                    >
+                      הבא ←
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <p className="text-white text-center">בחרו ניקוד:</p>
+                    <div className="grid grid-cols-5 gap-2">
+                      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => (
+                        <button
+                          key={n}
+                          onClick={() => setDrawingScore(n)}
+                          className={`py-2 rounded-lg font-bold text-lg transition-colors ${
+                            drawingScore === n
+                              ? 'bg-yellow-400 text-black'
+                              : 'bg-white/20 text-white hover:bg-white/30'
+                          }`}
+                        >
+                          {n}
+                        </button>
+                      ))}
+                    </div>
+                    <button
+                      onClick={async () => {
+                        if (drawingScore === null) return;
+                        await doAction('score_drawing', { answerId: currentDrawing.id, score: drawingScore });
+                        setDrawingScore(null);
+                      }}
+                      disabled={drawingScore === null || loading}
+                      className="w-full bg-green-500 hover:bg-green-600 disabled:opacity-50 text-white font-bold py-3 rounded-xl text-lg"
+                    >
+                      שלח ניקוד ✓
+                    </button>
+                  </div>
+                )}
+
+                {/* Also show all scored drawings scored state and allow showing leaderboard */}
+                {allDrawingsScored && (
+                  <button
+                    onClick={() => doAction('show_leaderboard')}
+                    disabled={loading}
+                    className="w-full bg-purple-500 hover:bg-purple-600 disabled:opacity-50 text-white font-bold py-3 rounded-xl"
+                  >
+                    ✅ כל הציורים נוקדו — הצג דירוג
+                  </button>
+                )}
+              </div>
+            ) : (
+              <p className="text-white/60 text-center">אין ציורים להצגה</p>
+            )}
+          </div>
+        )}
 
         {/* Greeting Controller */}
         {isGreetingQuestion && game?.status === 'answer_revealed' && (
@@ -309,7 +425,11 @@ export default function AdminScreen({ params }: PageProps) {
           <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4">
             <h2 className="text-white font-bold text-lg mb-2">שאלה נוכחית ({currentQuestion.question_order}/{allQuestions.length})</h2>
             <p className="text-white text-xl" dir="rtl">
-              {currentQuestion.question_type === 'free_text_greeting' ? 'כתבו ברכה לאביה!' : currentQuestion.question_text}
+              {currentQuestion.question_type === 'free_text_greeting'
+                ? 'כתבו ברכה לאביה!'
+                : currentQuestion.question_type === 'drawing_contest'
+                ? 'תחרות ציורים!'
+                : currentQuestion.question_text}
             </p>
             <p className="text-green-300 mt-2">תשובה נכונה: {currentQuestion.correct_answer}</p>
             <p className="text-pink-200 mt-2">{answers.length}/{players.length} ענו</p>
@@ -317,7 +437,7 @@ export default function AdminScreen({ params }: PageProps) {
         )}
 
         {/* Answers */}
-        {answers.length > 0 && !isGreetingQuestion && (
+        {answers.length > 0 && !isGreetingQuestion && !isDrawingQuestion && (
           <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4">
             <h2 className="text-white font-bold text-lg mb-2">תשובות שחקנים</h2>
             <div className="space-y-2 max-h-48 overflow-y-auto">

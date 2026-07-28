@@ -206,6 +206,52 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ success: true });
       }
 
+      case 'score_drawing': {
+        const answerId = body.answerId as string;
+        const score = body.score as number;
+
+        // Fetch the answer
+        const { data: answer, error: answerError } = await supabase
+          .from('answers')
+          .select('player_id, base_score')
+          .eq('id', answerId)
+          .single();
+
+        if (answerError || !answer) {
+          return NextResponse.json({ error: 'תשובה לא נמצאה' }, { status: 404 });
+        }
+
+        // Check if already scored
+        if ((answer.base_score ?? 0) > 0) {
+          return NextResponse.json({ alreadyScored: true });
+        }
+
+        const points = score * 100;
+
+        // Update the answer
+        await supabase
+          .from('answers')
+          .update({ base_score: points, total_score: points })
+          .eq('id', answerId);
+
+        // Fetch current player total_score
+        const { data: playerData } = await supabase
+          .from('players')
+          .select('total_score')
+          .eq('id', answer.player_id)
+          .single();
+
+        const currentTotal = playerData?.total_score ?? 0;
+
+        // Update player total
+        await supabase
+          .from('players')
+          .update({ total_score: currentTotal + points })
+          .eq('id', answer.player_id);
+
+        return NextResponse.json({ success: true });
+      }
+
       default:
         return NextResponse.json({ error: 'פעולה לא מוכרת' }, { status: 400 });
     }

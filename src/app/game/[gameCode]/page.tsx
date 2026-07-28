@@ -93,6 +93,7 @@ export default function GameScreen({ params }: PageProps) {
 
   // Compute active greeting state (needed before polling useEffect so deps are in scope)
   const isGreetingQuestion = currentQuestion?.question_type === 'free_text_greeting';
+  const isDrawingQuestion = currentQuestion?.question_type === 'drawing_contest';
   const greetingIndex = game?.greeting_index ?? -1;
 
   const sortedGreetingAnswers = isGreetingQuestion
@@ -100,6 +101,20 @@ export default function GameScreen({ params }: PageProps) {
     : [];
 
   const activeAnswer = greetingIndex >= 0 ? (sortedGreetingAnswers[greetingIndex] ?? null) : null;
+
+  // Drawing contest computed vars
+  const sortedDrawingAnswers = isDrawingQuestion
+    ? [...answers].sort((a, b) => new Date(a.submitted_at).getTime() - new Date(b.submitted_at).getTime())
+    : [];
+
+  const activeDrawingAnswer = greetingIndex >= 0 ? (sortedDrawingAnswers[greetingIndex] ?? null) : null;
+  const activeDrawingPlayerName = activeDrawingAnswer
+    ? players.find(p => p.id === activeDrawingAnswer.player_id)?.display_name ?? '?'
+    : null;
+  const activeDrawingScore = activeDrawingAnswer
+    ? Math.round((activeDrawingAnswer.base_score ?? 0) / 100)
+    : 0;
+  const activeDrawingScored = (activeDrawingAnswer?.base_score ?? 0) > 0;
 
   let activeGreeting: { playerName: string; text: string; voice: string; predictionId?: string; videoUrl?: string } | null = null;
   if (activeAnswer) {
@@ -216,25 +231,77 @@ export default function GameScreen({ params }: PageProps) {
       {/* Question Active */}
       {game.status === 'question_active' && currentQuestion && (
         <div className="flex-1 flex flex-col items-center gap-8">
-          <div className="bg-white/20 backdrop-blur-sm rounded-3xl p-8 w-full max-w-4xl text-center">
-            <p className="text-pink-200 text-xl mb-2">שאלה {currentQuestion.question_order}</p>
-            <h2 className="text-4xl font-bold text-white">
-              {isGreetingQuestion ? 'כתבו ברכה לאביה!' : currentQuestion.question_text}
-            </h2>
-          </div>
+          {isDrawingQuestion ? (
+            <div className="flex-1 flex flex-col items-center gap-6">
+              <div className="bg-white/20 backdrop-blur-sm rounded-3xl p-6 text-center w-full max-w-2xl">
+                <p className="text-pink-200 text-xl mb-2">צייר את אבא של אביה!</p>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/aviya.png" alt="תמונת עזר" className="mx-auto max-h-96 rounded-2xl object-contain" />
+              </div>
+              <div className="bg-white/20 backdrop-blur-sm rounded-2xl p-6 text-center">
+                <p className="text-white text-3xl font-bold">{answers.length} / {players.length} שלחו ציור</p>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="bg-white/20 backdrop-blur-sm rounded-3xl p-8 w-full max-w-4xl text-center">
+                <p className="text-pink-200 text-xl mb-2">שאלה {currentQuestion.question_order}</p>
+                <h2 className="text-4xl font-bold text-white">
+                  {isGreetingQuestion ? 'כתבו ברכה לאביה!' : currentQuestion.question_text}
+                </h2>
+              </div>
 
-          <div className="bg-white/20 backdrop-blur-sm rounded-2xl p-6 text-center">
-            <p className="text-white text-3xl font-bold">
-              {answers.length} / {players.length} {isGreetingQuestion ? 'שלחו ברכה' : 'ענו'}
-            </p>
-          </div>
+              <div className="bg-white/20 backdrop-blur-sm rounded-2xl p-6 text-center">
+                <p className="text-white text-3xl font-bold">
+                  {answers.length} / {players.length} {isGreetingQuestion ? 'שלחו ברכה' : 'ענו'}
+                </p>
+              </div>
+            </>
+          )}
         </div>
       )}
 
       {/* Answer Revealed */}
       {game.status === 'answer_revealed' && currentQuestion && (
         <div className="flex-1 flex flex-col items-center gap-6 w-full max-w-3xl mx-auto">
-          {isGreetingQuestion ? (
+          {isDrawingQuestion ? (
+            <div className="flex-1 flex flex-col items-center justify-center w-full gap-6">
+              {greetingIndex < 0 || !activeDrawingAnswer ? (
+                <div className="text-center">
+                  <p className="text-5xl mb-4">🎨</p>
+                  <p className="text-pink-200 text-2xl animate-pulse">ממתינים לציור הבא...</p>
+                </div>
+              ) : greetingIndex >= sortedDrawingAnswers.length ? (
+                <div className="text-center">
+                  <p className="text-5xl mb-4">🏆</p>
+                  <p className="text-white text-2xl">כל הציורים נוקדו!</p>
+                </div>
+              ) : (
+                <>
+                  <div className="text-center">
+                    <p className="text-pink-200 text-lg">{greetingIndex + 1} / {sortedDrawingAnswers.length}</p>
+                    <p className="text-white text-3xl font-bold mt-1">{activeDrawingPlayerName}</p>
+                  </div>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    key={activeDrawingAnswer.id}
+                    src={activeDrawingAnswer.answer_value}
+                    alt="ציור"
+                    className="w-full max-w-lg rounded-2xl object-contain bg-white"
+                    style={{ maxHeight: '50vh' }}
+                  />
+                  {activeDrawingScored && (
+                    <div className="bg-yellow-400/30 border-2 border-yellow-400 rounded-2xl px-8 py-4 text-center">
+                      <p className="text-yellow-200 text-lg">ניקוד</p>
+                      <p className="text-white text-6xl font-bold">
+                        {activeDrawingScore}<span className="text-3xl text-yellow-200">/10</span>
+                      </p>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          ) : isGreetingQuestion ? (
             <div className="flex-1 flex flex-col items-center justify-center w-full gap-6">
               {!activeGreeting ? (
                 <div className="text-center">
