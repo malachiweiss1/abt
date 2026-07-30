@@ -120,16 +120,6 @@ export default function GameScreen({ params }: PageProps) {
     return () => clearInterval(id);
   }, [currentQuestion?.question_type, game?.status, game?.question_started_at]);
 
-  // Try to autoplay video; show click overlay if browser blocks it
-  const isVideoActive = currentQuestion?.question_type === 'video_question' && game?.status === 'question_active';
-  useEffect(() => {
-    if (!isVideoActive) return;
-    setVideoBlocked(false);
-    const vid = videoRef.current;
-    if (!vid) return;
-    vid.play().catch(() => setVideoBlocked(true));
-  }, [isVideoActive, videoIndex]);
-
   // Compute active greeting state (needed before polling useEffect so deps are in scope)
   const isGreetingQuestion = currentQuestion?.question_type === 'free_text_greeting';
   const isDrawingQuestion = currentQuestion?.question_type === 'drawing_contest';
@@ -139,6 +129,16 @@ export default function GameScreen({ params }: PageProps) {
   const isVideoQuestion = currentQuestion?.question_type === 'video_question';
   const videoQuestions = allQuestions.filter(q => q.question_type === 'video_question').sort((a, b) => a.question_order - b.question_order);
   const videoIndex = isVideoQuestion ? (videoQuestions.findIndex(q => q.id === currentQuestion?.id) + 1) : 0;
+
+  // Try to autoplay video; show click overlay if browser blocks it
+  const isVideoActive = isVideoQuestion && game?.status === 'question_active';
+  useEffect(() => {
+    if (!isVideoActive) return;
+    setVideoBlocked(false);
+    const vid = videoRef.current;
+    if (!vid) return;
+    vid.play().catch(() => setVideoBlocked(true));
+  }, [isVideoActive, videoIndex]);
   const greetingIndex = game?.greeting_index ?? -1;
 
   const sortedGreetingAnswers = isGreetingQuestion
