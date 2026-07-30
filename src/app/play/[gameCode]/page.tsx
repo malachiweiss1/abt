@@ -38,7 +38,7 @@ const MEME_IMAGES = [
   '/images/FD0670B9-1E59-4E59-B34B-E2000A7F4728.png',
 ];
 
-const TF_TIME_LIMIT = 60; // seconds
+const TF_TIME_LIMIT = 45; // seconds
 
 interface PageProps {
   params: Promise<{ gameCode: string }>;

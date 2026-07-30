@@ -111,7 +111,7 @@ export default function GameScreen({ params }: PageProps) {
 
     const tick = () => {
       const elapsed = Math.floor((Date.now() - new Date(game.question_started_at!).getTime()) / 1000);
-      setTfTimeLeft(Math.max(0, 60 - elapsed));
+      setTfTimeLeft(Math.max(0, 45 - elapsed));
     };
     tick();
     const id = setInterval(tick, 500);
@@ -295,7 +295,7 @@ export default function GameScreen({ params }: PageProps) {
               <div className="w-64 bg-white/20 rounded-full h-4">
                 <div
                   className={`h-4 rounded-full transition-all ${tfTimeLeft > 20 ? 'bg-green-400' : tfTimeLeft > 10 ? 'bg-yellow-400' : 'bg-red-400'}`}
-                  style={{ width: `${(tfTimeLeft / 60) * 100}%` }}
+                  style={{ width: `${(tfTimeLeft / 45) * 100}%` }}
                 />
               </div>
               <p className="text-white text-3xl font-bold">✅ נכון / לא נכון</p>
@@ -317,13 +317,18 @@ export default function GameScreen({ params }: PageProps) {
               <video
                 key={videoIndex}
                 src={`/videos/${videoIndex}.mp4`}
-                controls
                 autoPlay
-                className="w-full rounded-2xl max-h-[70vh] bg-black"
+                className="w-full rounded-2xl max-h-[80vh] bg-black"
+                onEnded={async () => {
+                  try {
+                    await fetch('/api/video-reveal', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ gameCode }),
+                    });
+                  } catch { /* ignore */ }
+                }}
               />
-              <div className="bg-white/20 backdrop-blur-sm rounded-2xl p-4 text-center">
-                <p className="text-white text-2xl font-bold">{answers.length} / {players.length} ענו</p>
-              </div>
             </div>
           ) : isDrawingQuestion ? (
             <div className="flex-1 flex flex-col items-center gap-6">
