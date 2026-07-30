@@ -20,6 +20,8 @@ export default function GameScreen({ params }: PageProps) {
   const [error, setError] = useState<string | null>(null);
   const [origin, setOrigin] = useState('');
   const [tfTimeLeft, setTfTimeLeft] = useState(60);
+  const [videoBlocked, setVideoBlocked] = useState(false);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
   const videoPollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
@@ -117,6 +119,16 @@ export default function GameScreen({ params }: PageProps) {
     const id = setInterval(tick, 500);
     return () => clearInterval(id);
   }, [currentQuestion?.question_type, game?.status, game?.question_started_at]);
+
+  // Try to autoplay video; show click overlay if browser blocks it
+  const isVideoActive = currentQuestion?.question_type === 'video_question' && game?.status === 'question_active';
+  useEffect(() => {
+    if (!isVideoActive) return;
+    setVideoBlocked(false);
+    const vid = videoRef.current;
+    if (!vid) return;
+    vid.play().catch(() => setVideoBlocked(true));
+  }, [isVideoActive, videoIndex]);
 
   // Compute active greeting state (needed before polling useEffect so deps are in scope)
   const isGreetingQuestion = currentQuestion?.question_type === 'free_text_greeting';
@@ -312,12 +324,13 @@ export default function GameScreen({ params }: PageProps) {
               </div>
             </div>
           ) : isVideoQuestion ? (
-            <div className="flex-1 flex flex-col items-center gap-6 w-full">
+            <div className="flex-1 flex flex-col items-center gap-6 w-full relative">
               {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
               <video
+                ref={videoRef}
                 key={videoIndex}
                 src={`/videos/${videoIndex}.mp4`}
-                autoPlay
+                playsInline
                 className="w-full rounded-2xl max-h-[80vh] bg-black"
                 onEnded={async () => {
                   try {
@@ -329,6 +342,18 @@ export default function GameScreen({ params }: PageProps) {
                   } catch { /* ignore */ }
                 }}
               />
+              {videoBlocked && (
+                <button
+                  onClick={() => {
+                    setVideoBlocked(false);
+                    videoRef.current?.play();
+                  }}
+                  className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 rounded-2xl text-white gap-4"
+                >
+                  <span className="text-8xl">▶</span>
+                  <span className="text-3xl font-bold">לחץ להפעלה</span>
+                </button>
+              )}
             </div>
           ) : isDrawingQuestion ? (
             <div className="flex-1 flex flex-col items-center gap-6">

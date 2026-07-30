@@ -76,10 +76,11 @@ export async function POST(request: NextRequest) {
       }
 
       case 'reveal_video_question': {
-        await supabase
+        const { error: rvqError } = await supabase
           .from('games')
           .update({ status: 'video_revealed', updated_at: new Date().toISOString() })
           .eq('id', game.id);
+        if (rvqError) return NextResponse.json({ error: rvqError.message }, { status: 500 });
         return NextResponse.json({ success: true });
       }
 

@@ -683,7 +683,7 @@ export default function AdminScreen({ params }: PageProps) {
                 ? `🎬 סרטון ${videoIndex || currentQuestion.question_order}`
                 : currentQuestion.question_text}
             </p>
-            <p className="text-green-300 mt-2">תשובה נכונה: {currentQuestion.correct_answer}</p>
+            <p className="text-green-300 mt-2" dir="rtl">תשובה נכונה: {currentQuestion.correct_answer}</p>
             <p className="text-pink-200 mt-2">{answers.length}/{players.length} ענו</p>
           </div>
         )}
