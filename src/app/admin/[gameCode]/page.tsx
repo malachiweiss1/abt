@@ -165,7 +165,9 @@ export default function AdminScreen({ params }: PageProps) {
   const isGreetingQuestion = currentQuestion?.question_type === 'free_text_greeting';
   const isDrawingQuestion = currentQuestion?.question_type === 'drawing_contest';
   const isImageContestQuestion = currentQuestion?.question_type === 'ai_image_contest';
-  const isImageQuestion = isDrawingQuestion || isImageContestQuestion;
+  const isTrueFalseQuestion = currentQuestion?.question_type === 'true_false_rapid';
+  const isMemeQuestion = currentQuestion?.question_type === 'meme_contest';
+  const isImageQuestion = isDrawingQuestion || isImageContestQuestion || isMemeQuestion;
   const greetingIndex = game?.greeting_index ?? -1;
 
   // Parse greeting answers for the controller list
@@ -181,16 +183,26 @@ export default function AdminScreen({ params }: PageProps) {
       })
     : [];
 
-  // Drawing / AI image contest computed vars
+  // Drawing / AI image / meme contest computed vars
   const drawingAnswers = isImageQuestion
-    ? answers.map(a => ({
-        id: a.id,
-        playerId: a.player_id,
-        playerName: players.find(p => p.id === a.player_id)?.display_name ?? '?',
-        imageUrl: a.answer_value,
-        scored: (a.base_score ?? 0) > 0,
-        scoreValue: Math.round((a.base_score ?? 0) / 100),
-      }))
+    ? answers.map(a => {
+        // For meme, preview = first image; for drawing/AI = the URL directly
+        let previewUrl = a.answer_value;
+        if (isMemeQuestion) {
+          try {
+            const memes = JSON.parse(a.answer_value);
+            previewUrl = memes[0]?.imageUrl ?? '';
+          } catch { /* ignore */ }
+        }
+        return {
+          id: a.id,
+          playerId: a.player_id,
+          playerName: players.find(p => p.id === a.player_id)?.display_name ?? '?',
+          imageUrl: previewUrl,
+          scored: (a.base_score ?? 0) > 0,
+          scoreValue: Math.round((a.base_score ?? 0) / 100),
+        };
+      })
     : [];
 
   const currentDrawing = greetingIndex >= 0 ? (drawingAnswers[greetingIndex] ?? null) : null;
@@ -274,7 +286,7 @@ export default function AdminScreen({ params }: PageProps) {
         {isImageQuestion && game?.status === 'answer_revealed' && (
           <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 space-y-4" dir="rtl">
             <div className="flex items-center justify-between">
-              <h2 className="text-white font-bold text-lg">{isDrawingQuestion ? '🎨 ניקוד ציורים' : '🤖 ניקוד תמונות AI'}</h2>
+              <h2 className="text-white font-bold text-lg">{isDrawingQuestion ? '🎨 ניקוד ציורים' : isMemeQuestion ? '😂 ניקוד ממים' : '🤖 ניקוד תמונות AI'}</h2>
               <span className="text-yellow-300 font-bold text-lg">
                 {greetingIndex < 0 ? 'טרם התחיל' : `${greetingIndex + 1} / ${drawingAnswers.length}`}
               </span>
@@ -496,6 +508,10 @@ export default function AdminScreen({ params }: PageProps) {
                 ? '🎨 ציור חופשי'
                 : currentQuestion.question_type === 'ai_image_contest'
                 ? '🤖 תמונת AI של אביה'
+                : currentQuestion.question_type === 'true_false_rapid'
+                ? '✅ נכון / לא נכון — 60 שניות'
+                : currentQuestion.question_type === 'meme_contest'
+                ? '😂 יצירת ממים'
                 : currentQuestion.question_text}
             </p>
             <p className="text-green-300 mt-2">תשובה נכונה: {currentQuestion.correct_answer}</p>

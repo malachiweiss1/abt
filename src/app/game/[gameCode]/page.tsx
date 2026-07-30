@@ -18,6 +18,7 @@ export default function GameScreen({ params }: PageProps) {
   const [answers, setAnswers] = useState<Answer[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [origin, setOrigin] = useState('');
+  const [tfTimeLeft, setTfTimeLeft] = useState(60);
   const videoPollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
@@ -93,10 +94,27 @@ export default function GameScreen({ params }: PageProps) {
     };
   }, [gameCode, loadGameData, supabase]);
 
+  // True/false countdown timer on game screen
+  useEffect(() => {
+    if (currentQuestion?.question_type !== 'true_false_rapid') return;
+    if (game?.status !== 'question_active') return;
+    if (!game?.question_started_at) return;
+
+    const tick = () => {
+      const elapsed = Math.floor((Date.now() - new Date(game.question_started_at!).getTime()) / 1000);
+      setTfTimeLeft(Math.max(0, 60 - elapsed));
+    };
+    tick();
+    const id = setInterval(tick, 500);
+    return () => clearInterval(id);
+  }, [currentQuestion?.question_type, game?.status, game?.question_started_at]);
+
   // Compute active greeting state (needed before polling useEffect so deps are in scope)
   const isGreetingQuestion = currentQuestion?.question_type === 'free_text_greeting';
   const isDrawingQuestion = currentQuestion?.question_type === 'drawing_contest';
   const isImageContestQuestion = currentQuestion?.question_type === 'ai_image_contest';
+  const isTrueFalseQuestion = currentQuestion?.question_type === 'true_false_rapid';
+  const isMemeQuestion = currentQuestion?.question_type === 'meme_contest';
   const greetingIndex = game?.greeting_index ?? -1;
 
   const sortedGreetingAnswers = isGreetingQuestion
@@ -234,7 +252,31 @@ export default function GameScreen({ params }: PageProps) {
       {/* Question Active */}
       {game.status === 'question_active' && currentQuestion && (
         <div className="flex-1 flex flex-col items-center gap-8">
-          {isDrawingQuestion ? (
+          {isTrueFalseQuestion ? (
+            <div className="flex-1 flex flex-col items-center justify-center gap-8">
+              <div className={`text-9xl font-bold tabular-nums ${tfTimeLeft > 20 ? 'text-green-300' : tfTimeLeft > 10 ? 'text-yellow-300' : 'text-red-400 animate-pulse'}`}>
+                {tfTimeLeft}
+              </div>
+              <div className="w-64 bg-white/20 rounded-full h-4">
+                <div
+                  className={`h-4 rounded-full transition-all ${tfTimeLeft > 20 ? 'bg-green-400' : tfTimeLeft > 10 ? 'bg-yellow-400' : 'bg-red-400'}`}
+                  style={{ width: `${(tfTimeLeft / 60) * 100}%` }}
+                />
+              </div>
+              <p className="text-white text-3xl font-bold">✅ נכון / לא נכון</p>
+              <div className="bg-white/20 backdrop-blur-sm rounded-2xl p-6 text-center">
+                <p className="text-white text-3xl font-bold">{answers.length} / {players.length} סיימו</p>
+              </div>
+            </div>
+          ) : isMemeQuestion ? (
+            <div className="flex-1 flex flex-col items-center justify-center gap-6">
+              <p className="text-white text-6xl font-bold text-center">😂</p>
+              <p className="text-white text-4xl font-bold text-center">צרו ממים!</p>
+              <div className="bg-white/20 backdrop-blur-sm rounded-2xl p-6 text-center">
+                <p className="text-white text-3xl font-bold">{answers.length} / {players.length} שלחו</p>
+              </div>
+            </div>
+          ) : isDrawingQuestion ? (
             <div className="flex-1 flex flex-col items-center gap-6">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/aviya.png" alt="תמונת עזר" className="mx-auto max-h-[70vh] rounded-2xl object-contain" />
@@ -271,7 +313,75 @@ export default function GameScreen({ params }: PageProps) {
       {/* Answer Revealed */}
       {game.status === 'answer_revealed' && currentQuestion && (
         <div className="flex-1 flex flex-col items-center gap-6 w-full max-w-3xl mx-auto">
-          {isDrawingQuestion ? (
+          {isTrueFalseQuestion ? (
+            // Show leaderboard-style breakdown
+            <div className="flex-1 flex flex-col w-full gap-4">
+              <h2 className="text-3xl font-bold text-white text-center">✅ תוצאות נכון/לא נכון</h2>
+              <div className="w-full space-y-3 max-h-[70vh] overflow-y-auto">
+                {players.map((p, i) => {
+                  const pAnswer = answers.find(a => a.player_id === p.id);
+                  let correct = 0, total = 0;
+                  if (pAnswer) {
+                    try {
+                      const parsed = JSON.parse(pAnswer.answer_value);
+                      correct = parsed.correctCount ?? 0;
+                      total = parsed.answers?.length ?? 0;
+                    } catch { /* ignore */ }
+                  }
+                  return (
+                    <div key={p.id} className={`flex items-center gap-4 rounded-2xl p-4 ${i === 0 ? 'bg-yellow-400/40 border border-yellow-400' : 'bg-white/20'}`}>
+                      <span className="text-2xl font-bold text-white w-8">{i + 1}.</span>
+                      <span className="text-xl text-white flex-1">{p.display_name}</span>
+                      <span className="text-green-300 font-bold">{correct}/{total}</span>
+                      <span className="text-yellow-300 font-bold text-xl">{pAnswer ? correct * 100 : 0}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : isMemeQuestion ? (
+            // Show meme gallery — carousel through each player's memes
+            <div className="flex-1 flex flex-col items-center justify-center w-full gap-6">
+              {greetingIndex < 0 || !answers[greetingIndex] ? (
+                <div className="text-center">
+                  <p className="text-5xl mb-4">😂</p>
+                  <p className="text-pink-200 text-2xl animate-pulse">ממתינים לממים...</p>
+                </div>
+              ) : (() => {
+                const playerAnswer = answers[greetingIndex];
+                const pName = players.find(p => p.id === playerAnswer.player_id)?.display_name ?? '?';
+                let memes: { imageUrl: string; caption: string }[] = [];
+                try { memes = JSON.parse(playerAnswer.answer_value); } catch { /* ignore */ }
+                return (
+                  <>
+                    <div className="text-center">
+                      <p className="text-pink-200 text-lg">{greetingIndex + 1} / {answers.length}</p>
+                      <p className="text-white text-3xl font-bold mt-1">{pName}</p>
+                    </div>
+                    <div className="flex gap-4 overflow-x-auto w-full pb-2">
+                      {memes.map((m, i) => (
+                        <div key={i} className="flex-shrink-0 relative rounded-2xl overflow-hidden bg-black" style={{ width: 280, height: 280 }}>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={m.imageUrl} alt="מם" className="w-full h-full object-contain" />
+                          {m.caption && (
+                            <div className="absolute bottom-0 left-0 right-0 bg-black/80 text-white text-center font-bold text-lg p-2">
+                              {m.caption}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                    {(playerAnswer.base_score ?? 0) > 0 && (
+                      <div className="bg-yellow-400/30 border-2 border-yellow-400 rounded-2xl px-8 py-4 text-center">
+                        <p className="text-yellow-200 text-lg">ניקוד</p>
+                        <p className="text-white text-6xl font-bold">{Math.round((playerAnswer.base_score ?? 0) / 100)}<span className="text-3xl text-yellow-200">/10</span></p>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
+            </div>
+          ) : isDrawingQuestion ? (
             <div className="flex-1 flex flex-col items-center justify-center w-full gap-6">
               {greetingIndex < 0 || !activeDrawingAnswer ? (
                 <div className="text-center">

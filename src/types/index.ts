@@ -17,7 +17,7 @@ export interface Question {
   game_id: string;
   question_order: number;
   question_text: string;
-  question_type: 'multiple_choice' | 'free_text_greeting' | 'drawing_contest' | 'ai_image_contest';
+  question_type: 'multiple_choice' | 'free_text_greeting' | 'drawing_contest' | 'ai_image_contest' | 'true_false_rapid' | 'meme_contest' | 'video_question';
   options: string[];
   correct_answer: string;
   time_limit_seconds: number;

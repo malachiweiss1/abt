@@ -6,7 +6,7 @@ export async function POST(request: NextRequest) {
   try {
     const { gameCode, questionId, playerId, answerValue } = await request.json();
 
-    if (!answerValue?.trim()) {
+    if (!answerValue) {
       return NextResponse.json({ error: 'תשובה לא יכולה להיות ריקה' }, { status: 400 });
     }
 
@@ -38,15 +38,37 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'שאלה לא נמצאה' }, { status: 404 });
     }
 
-    const isGreeting = question.question_type === 'free_text_greeting';
+    const qType = question.question_type;
     const startedAt = new Date(game.question_started_at!).getTime();
     const responseTimeMs = Date.now() - startedAt;
 
-    // Greeting questions: everyone is "correct", no score
-    const isCorrect = isGreeting ? true : answerValue.trim() === question.correct_answer;
-    const { baseScore, speedBonus, totalScore } = isGreeting
-      ? { baseScore: 0, speedBonus: 0, totalScore: 0 }
-      : calculateScore(isCorrect, Math.min(responseTimeMs, question.time_limit_seconds * 1000), question.time_limit_seconds);
+    // Score logic per question type
+    let isCorrect: boolean;
+    let baseScore: number, speedBonus: number, totalScore: number;
+
+    if (['free_text_greeting', 'drawing_contest', 'ai_image_contest', 'meme_contest'].includes(qType)) {
+      // No auto-scoring — admin scores manually
+      isCorrect = true;
+      baseScore = speedBonus = totalScore = 0;
+    } else if (qType === 'true_false_rapid') {
+      // answer_value is JSON: {answers: string[], correctCount: number}
+      let correctCount = 0;
+      try {
+        const parsed = JSON.parse(answerValue);
+        correctCount = parsed.correctCount ?? 0;
+      } catch { /* ignore */ }
+      isCorrect = correctCount > 0;
+      baseScore = correctCount * 100;
+      speedBonus = 0;
+      totalScore = baseScore;
+    } else {
+      // multiple_choice / video_question: compare to correct_answer
+      isCorrect = answerValue.trim() === question.correct_answer;
+      const score = calculateScore(isCorrect, Math.min(responseTimeMs, question.time_limit_seconds * 1000), question.time_limit_seconds);
+      baseScore = score.baseScore;
+      speedBonus = score.speedBonus;
+      totalScore = score.totalScore;
+    }
 
     // Check for duplicate
     const { data: existingAnswer } = await supabase
@@ -67,7 +89,7 @@ export async function POST(request: NextRequest) {
         game_id: game.id,
         question_id: questionId,
         player_id: playerId,
-        answer_value: answerValue.trim(),
+        answer_value: answerValue,
         is_correct: isCorrect,
         response_time_ms: responseTimeMs,
         base_score: baseScore,
