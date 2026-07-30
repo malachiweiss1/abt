@@ -115,6 +115,7 @@ export default function GameScreen({ params }: PageProps) {
   const isImageContestQuestion = currentQuestion?.question_type === 'ai_image_contest';
   const isTrueFalseQuestion = currentQuestion?.question_type === 'true_false_rapid';
   const isMemeQuestion = currentQuestion?.question_type === 'meme_contest';
+  const isVideoQuestion = currentQuestion?.question_type === 'video_question';
   const greetingIndex = game?.greeting_index ?? -1;
 
   const sortedGreetingAnswers = isGreetingQuestion
@@ -274,6 +275,23 @@ export default function GameScreen({ params }: PageProps) {
               <p className="text-white text-4xl font-bold text-center">צרו ממים!</p>
               <div className="bg-white/20 backdrop-blur-sm rounded-2xl p-6 text-center">
                 <p className="text-white text-3xl font-bold">{answers.length} / {players.length} שלחו</p>
+              </div>
+            </div>
+          ) : isVideoQuestion ? (
+            <div className="flex-1 flex flex-col items-center gap-6 w-full">
+              {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+              <video
+                key={currentQuestion.question_order}
+                src={`/videos/${currentQuestion.question_order}.mp4`}
+                controls
+                autoPlay
+                className="w-full rounded-2xl max-h-[55vh] bg-black"
+              />
+              <div className="bg-white/20 backdrop-blur-sm rounded-3xl p-6 w-full max-w-4xl text-center">
+                <h2 className="text-3xl font-bold text-white">{currentQuestion.question_text}</h2>
+              </div>
+              <div className="bg-white/20 backdrop-blur-sm rounded-2xl p-4 text-center">
+                <p className="text-white text-2xl font-bold">{answers.length} / {players.length} ענו</p>
               </div>
             </div>
           ) : isDrawingQuestion ? (

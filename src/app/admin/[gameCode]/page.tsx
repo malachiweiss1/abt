@@ -512,6 +512,8 @@ export default function AdminScreen({ params }: PageProps) {
                 ? '✅ נכון / לא נכון — 60 שניות'
                 : currentQuestion.question_type === 'meme_contest'
                 ? '😂 יצירת ממים'
+                : currentQuestion.question_type === 'video_question'
+                ? `🎬 סרטון ${currentQuestion.question_order}`
                 : currentQuestion.question_text}
             </p>
             <p className="text-green-300 mt-2">תשובה נכונה: {currentQuestion.correct_answer}</p>
