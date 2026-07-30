@@ -296,10 +296,21 @@ export default function AdminScreen({ params }: PageProps) {
               </span>
             </div>
 
-            {greetingIndex < 0 ? (
+            {drawingAnswers.length === 0 ? (
+              <div className="space-y-3">
+                <p className="text-white/60 text-center">אין הגשות להצגה</p>
+                <button
+                  onClick={() => doAction('show_leaderboard')}
+                  disabled={loading}
+                  className="w-full bg-purple-500 hover:bg-purple-600 disabled:opacity-50 text-white font-bold py-4 rounded-xl text-lg"
+                >
+                  הצג דירוג
+                </button>
+              </div>
+            ) : greetingIndex < 0 ? (
               <button
                 onClick={() => doAction('greeting_start')}
-                disabled={loading || drawingAnswers.length === 0}
+                disabled={loading}
                 className="w-full bg-green-500 hover:bg-green-600 disabled:opacity-50 text-white font-bold py-4 rounded-xl text-lg"
               >
                 ▶ התחל סיור ציורים
