@@ -391,12 +391,12 @@ export default function GameScreen({ params }: PageProps) {
 
       {/* Video Revealed — question shown after video */}
       {(game.status === 'video_revealed') && currentQuestion && (
-        <div className="flex-1 flex flex-col items-center gap-8">
-          <div className="bg-white/20 backdrop-blur-sm rounded-3xl p-8 w-full max-w-4xl text-center" dir="rtl">
+        <div className="flex-1 flex flex-col items-center gap-8" dir="rtl">
+          <div className="bg-white/20 backdrop-blur-sm rounded-3xl p-8 w-full max-w-4xl text-center">
             <p className="text-pink-200 text-xl mb-2">שאלה {currentQuestion.question_order}</p>
             <h2 className="text-4xl font-bold text-white">{currentQuestion.question_text}</h2>
           </div>
-          <div className="grid grid-cols-2 gap-4 w-full max-w-4xl">
+          <div className="grid grid-cols-2 gap-4 w-full max-w-4xl" dir="rtl">
             {(currentQuestion.options as string[]).map((opt: string) => (
               <div key={opt} className="bg-white/20 backdrop-blur-sm rounded-2xl p-4 text-center">
                 <p className="text-white text-2xl font-bold">{opt}</p>

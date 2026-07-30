@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'משחק לא נמצא' }, { status: 404 });
     }
 
-    if (game.status !== 'question_active') {
+    if (game.status !== 'question_active' && game.status !== 'video_revealed') {
       return NextResponse.json({ error: 'השאלה לא פעילה כרגע' }, { status: 400 });
     }
 
