@@ -23,6 +23,7 @@ export default function AdminScreen({ params }: PageProps) {
   const [adminPassword, setAdminPassword] = useState('');
   const [drawingScore, setDrawingScore] = useState<number | null>(null);
   const [greetingScore, setGreetingScore] = useState<number | null>(null);
+  const [memeScore, setMemeScore] = useState<number | null>(null);
 
   const supabase = createClient();
 
@@ -155,6 +156,7 @@ export default function AdminScreen({ params }: PageProps) {
   const statusLabels: Record<string, string> = {
     waiting: 'ממתין',
     question_active: 'שאלה פעילה',
+    video_revealed: 'שאלה על הסרטון',
     answer_revealed: 'תשובה נחשפה',
     leaderboard: 'טבלת מובילים',
     finished: 'הסתיים',
@@ -167,7 +169,10 @@ export default function AdminScreen({ params }: PageProps) {
   const isImageContestQuestion = currentQuestion?.question_type === 'ai_image_contest';
   const isTrueFalseQuestion = currentQuestion?.question_type === 'true_false_rapid';
   const isMemeQuestion = currentQuestion?.question_type === 'meme_contest';
+  const isVideoQuestion = currentQuestion?.question_type === 'video_question';
   const isImageQuestion = isDrawingQuestion || isImageContestQuestion || isMemeQuestion;
+  const videoQuestions = allQuestions.filter(q => q.question_type === 'video_question').sort((a, b) => a.question_order - b.question_order);
+  const videoIndex = isVideoQuestion ? (videoQuestions.findIndex(q => q.id === currentQuestion?.id) + 1) : 0;
   const greetingIndex = game?.greeting_index ?? -1;
 
   // Parse greeting answers for the controller list (skip blank submissions)
@@ -210,7 +215,42 @@ export default function AdminScreen({ params }: PageProps) {
     : [];
 
   const currentDrawing = greetingIndex >= 0 ? (drawingAnswers[greetingIndex] ?? null) : null;
-  const allDrawingsScored = drawingAnswers.length > 0 && drawingAnswers.every(d => d.scored);
+
+  // Flat list of individual memes across all players (for meme_contest)
+  interface FlatMeme {
+    answerId: string;
+    playerId: string;
+    playerName: string;
+    imageUrl: string;
+    caption: string;
+    score?: number;
+    answerMemeIndex: number;
+  }
+  const flatMemes: FlatMeme[] = isMemeQuestion
+    ? answers
+        .filter(a => a.answer_value !== '__skip__')
+        .sort((a, b) => new Date(a.submitted_at).getTime() - new Date(b.submitted_at).getTime())
+        .flatMap(a => {
+          try {
+            const memes: Array<{ imageUrl: string; caption: string; score?: number }> = JSON.parse(a.answer_value);
+            return memes.map((m, idx) => ({
+              answerId: a.id,
+              playerId: a.player_id,
+              playerName: players.find(p => p.id === a.player_id)?.display_name ?? '?',
+              imageUrl: m.imageUrl,
+              caption: m.caption,
+              score: m.score,
+              answerMemeIndex: idx,
+            }));
+          } catch { return []; }
+        })
+    : [];
+
+  const carouselLength = isMemeQuestion ? flatMemes.length : drawingAnswers.length;
+  const allItemsScored = isMemeQuestion
+    ? flatMemes.length > 0 && flatMemes.every(m => m.score !== undefined)
+    : drawingAnswers.length > 0 && drawingAnswers.every(d => d.scored);
+  const activeMemeItem = isMemeQuestion && greetingIndex >= 0 ? (flatMemes[greetingIndex] ?? null) : null;
 
   return (
     <div className="min-h-screen p-4" dir="rtl">
@@ -237,7 +277,19 @@ export default function AdminScreen({ params }: PageProps) {
             </button>
           )}
 
-          {game?.status === 'question_active' && (
+          {game?.status === 'question_active' && isVideoQuestion && (
+            <button onClick={() => doAction('reveal_video_question')} disabled={loading}
+              className="w-full bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white font-bold py-4 rounded-xl text-lg">
+              ▶ הצג שאלה (הסרטון נגמר)
+            </button>
+          )}
+          {game?.status === 'question_active' && !isVideoQuestion && (
+            <button onClick={() => doAction('reveal_answer')} disabled={loading}
+              className="w-full bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white font-bold py-4 rounded-xl text-lg">
+              חשוף תשובה
+            </button>
+          )}
+          {game?.status === 'video_revealed' && (
             <button onClick={() => doAction('reveal_answer')} disabled={loading}
               className="w-full bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white font-bold py-4 rounded-xl text-lg">
               חשוף תשובה
@@ -286,17 +338,19 @@ export default function AdminScreen({ params }: PageProps) {
           </button>
         </div>
 
-        {/* Drawing / AI Image Controller */}
+        {/* Drawing / AI Image / Meme Controller */}
         {isImageQuestion && game?.status === 'answer_revealed' && (
           <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 space-y-4" dir="rtl">
             <div className="flex items-center justify-between">
-              <h2 className="text-white font-bold text-lg">{isDrawingQuestion ? '🎨 ניקוד ציורים' : isMemeQuestion ? '😂 ניקוד ממים' : '🤖 ניקוד תמונות AI'}</h2>
+              <h2 className="text-white font-bold text-lg">
+                {isDrawingQuestion ? '🎨 ניקוד ציורים' : isMemeQuestion ? '😂 ניקוד ממים' : '🤖 ניקוד תמונות AI'}
+              </h2>
               <span className="text-yellow-300 font-bold text-lg">
-                {greetingIndex < 0 ? 'טרם התחיל' : greetingIndex >= drawingAnswers.length ? 'סיום' : `${greetingIndex + 1} / ${drawingAnswers.length}`}
+                {greetingIndex < 0 ? 'טרם התחיל' : greetingIndex >= carouselLength ? 'סיום' : `${greetingIndex + 1} / ${carouselLength}`}
               </span>
             </div>
 
-            {drawingAnswers.length === 0 ? (
+            {carouselLength === 0 ? (
               <div className="space-y-3">
                 <p className="text-white/60 text-center">אין הגשות להצגה</p>
                 <button
@@ -313,11 +367,11 @@ export default function AdminScreen({ params }: PageProps) {
                 disabled={loading}
                 className="w-full bg-green-500 hover:bg-green-600 disabled:opacity-50 text-white font-bold py-4 rounded-xl text-lg"
               >
-                ▶ התחל סיור ציורים
+                ▶ {isMemeQuestion ? 'התחל סיור ממים' : 'התחל סיור ציורים'}
               </button>
-            ) : greetingIndex >= drawingAnswers.length ? (
+            ) : greetingIndex >= carouselLength ? (
               <div className="space-y-3">
-                <div className="text-center text-white text-xl">✅ כל הציורים הוצגו!</div>
+                <div className="text-center text-white text-xl">✅ {isMemeQuestion ? 'כל הממים הוצגו!' : 'כל הציורים הוצגו!'}</div>
                 <button
                   onClick={() => doAction('show_leaderboard')}
                   disabled={loading}
@@ -332,6 +386,89 @@ export default function AdminScreen({ params }: PageProps) {
                 >
                   🔄 חזור להתחלה
                 </button>
+              </div>
+            ) : isMemeQuestion && activeMemeItem ? (
+              <div className="space-y-3">
+                <p className="text-white text-lg font-bold text-center">{activeMemeItem.playerName}</p>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <div className="relative rounded-xl overflow-hidden bg-black">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={activeMemeItem.imageUrl}
+                    alt="מם"
+                    className="w-full rounded-xl max-h-56 object-contain bg-white"
+                  />
+                  {activeMemeItem.caption && (
+                    <div className="absolute bottom-0 left-0 right-0 bg-black/80 text-white text-center font-bold text-lg p-2">
+                      {activeMemeItem.caption}
+                    </div>
+                  )}
+                </div>
+
+                {/* Navigation */}
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    onClick={() => doAction('greeting_prev')}
+                    disabled={loading || greetingIndex <= 0}
+                    className="bg-white/20 hover:bg-white/30 disabled:opacity-30 text-white font-bold py-3 rounded-xl text-lg"
+                  >
+                    ⏮ הקודם
+                  </button>
+                  <button
+                    onClick={() => doAction('greeting_next')}
+                    disabled={loading}
+                    className="bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white font-bold py-3 rounded-xl text-lg"
+                  >
+                    {greetingIndex >= carouselLength - 1 ? '✓ סיום' : 'הבא ⏭'}
+                  </button>
+                </div>
+
+                {/* Per-meme scoring */}
+                {activeMemeItem.score !== undefined ? (
+                  <p className="text-yellow-300 text-center text-lg font-bold">ניקוד: {activeMemeItem.score}/10</p>
+                ) : (
+                  <div className="space-y-3">
+                    <p className="text-white text-center">בחרו ניקוד למם:</p>
+                    <div className="grid grid-cols-5 gap-2">
+                      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => (
+                        <button
+                          key={n}
+                          onClick={() => setMemeScore(n)}
+                          className={`py-2 rounded-lg font-bold text-lg transition-colors ${
+                            memeScore === n ? 'bg-yellow-400 text-black' : 'bg-white/20 text-white hover:bg-white/30'
+                          }`}
+                        >
+                          {n}
+                        </button>
+                      ))}
+                    </div>
+                    <button
+                      onClick={async () => {
+                        if (memeScore === null) return;
+                        await doAction('score_meme', {
+                          answerId: activeMemeItem.answerId,
+                          memeIndex: activeMemeItem.answerMemeIndex,
+                          score: memeScore,
+                        });
+                        setMemeScore(null);
+                      }}
+                      disabled={memeScore === null || loading}
+                      className="w-full bg-green-500 hover:bg-green-600 disabled:opacity-50 text-white font-bold py-3 rounded-xl text-lg"
+                    >
+                      שלח ניקוד ✓
+                    </button>
+                  </div>
+                )}
+
+                {allItemsScored && (
+                  <button
+                    onClick={() => doAction('show_leaderboard')}
+                    disabled={loading}
+                    className="w-full bg-purple-500 hover:bg-purple-600 disabled:opacity-50 text-white font-bold py-3 rounded-xl"
+                  >
+                    ✅ כל הממים נוקדו — הצג דירוג
+                  </button>
+                )}
               </div>
             ) : currentDrawing ? (
               <div className="space-y-3">
@@ -357,7 +494,7 @@ export default function AdminScreen({ params }: PageProps) {
                     disabled={loading}
                     className="bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white font-bold py-3 rounded-xl text-lg"
                   >
-                    {greetingIndex >= drawingAnswers.length - 1 ? '✓ סיום' : 'הבא ⏭'}
+                    {greetingIndex >= carouselLength - 1 ? '✓ סיום' : 'הבא ⏭'}
                   </button>
                 </div>
 
@@ -395,7 +532,7 @@ export default function AdminScreen({ params }: PageProps) {
                   </div>
                 )}
 
-                {allDrawingsScored && (
+                {allItemsScored && (
                   <button
                     onClick={() => doAction('show_leaderboard')}
                     disabled={loading}
@@ -543,7 +680,7 @@ export default function AdminScreen({ params }: PageProps) {
                 : currentQuestion.question_type === 'meme_contest'
                 ? '😂 יצירת ממים'
                 : currentQuestion.question_type === 'video_question'
-                ? `🎬 סרטון ${currentQuestion.question_order}`
+                ? `🎬 סרטון ${videoIndex || currentQuestion.question_order}`
                 : currentQuestion.question_text}
             </p>
             <p className="text-green-300 mt-2">תשובה נכונה: {currentQuestion.correct_answer}</p>

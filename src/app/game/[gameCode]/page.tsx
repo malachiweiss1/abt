@@ -14,6 +14,7 @@ export default function GameScreen({ params }: PageProps) {
   const { gameCode } = use(params);
   const [game, setGame] = useState<Game | null>(null);
   const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null);
+  const [allQuestions, setAllQuestions] = useState<Question[]>([]);
   const [players, setPlayers] = useState<Player[]>([]);
   const [answers, setAnswers] = useState<Answer[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -45,6 +46,13 @@ export default function GameScreen({ params }: PageProps) {
     const { data: greetingIdx } = await supabase.rpc('get_greeting_index', { p_game_id: gameData.id });
     setGame({ ...gameData, greeting_index: (greetingIdx as number) ?? -1 });
 
+    const { data: allQuestionsData } = await supabase
+      .from('questions')
+      .select('*')
+      .eq('game_id', gameData.id)
+      .order('question_order');
+    setAllQuestions(allQuestionsData || []);
+
     if (gameData.current_question_id) {
       const { data: questionData } = await supabase
         .from('questions')
@@ -53,11 +61,12 @@ export default function GameScreen({ params }: PageProps) {
         .single();
       setCurrentQuestion(questionData);
 
-      if (gameData.status === 'question_active' || gameData.status === 'answer_revealed') {
+      if (gameData.status === 'question_active' || gameData.status === 'answer_revealed' || gameData.status === 'video_revealed') {
         const { data: answersData } = await supabase
           .from('answers')
           .select('*')
-          .eq('question_id', gameData.current_question_id);
+          .eq('question_id', gameData.current_question_id)
+          .order('submitted_at');
         setAnswers(answersData || []);
       }
     } else {
@@ -116,6 +125,8 @@ export default function GameScreen({ params }: PageProps) {
   const isTrueFalseQuestion = currentQuestion?.question_type === 'true_false_rapid';
   const isMemeQuestion = currentQuestion?.question_type === 'meme_contest';
   const isVideoQuestion = currentQuestion?.question_type === 'video_question';
+  const videoQuestions = allQuestions.filter(q => q.question_type === 'video_question').sort((a, b) => a.question_order - b.question_order);
+  const videoIndex = isVideoQuestion ? (videoQuestions.findIndex(q => q.id === currentQuestion?.id) + 1) : 0;
   const greetingIndex = game?.greeting_index ?? -1;
 
   const sortedGreetingAnswers = isGreetingQuestion
@@ -165,6 +176,25 @@ export default function GameScreen({ params }: PageProps) {
       videoUrl,
     };
   }
+
+  // Flat meme list for game screen display
+  const flatMemes = isMemeQuestion
+    ? [...answers]
+        .filter(a => a.answer_value !== '__skip__')
+        .sort((a, b) => new Date(a.submitted_at).getTime() - new Date(b.submitted_at).getTime())
+        .flatMap(a => {
+          try {
+            const memes: Array<{ imageUrl: string; caption: string; score?: number }> = JSON.parse(a.answer_value);
+            return memes.map(m => ({
+              playerName: players.find(p => p.id === a.player_id)?.display_name ?? '?',
+              imageUrl: m.imageUrl,
+              caption: m.caption,
+              score: m.score,
+            }));
+          } catch { return []; }
+        })
+    : [];
+  const activeMeme = isMemeQuestion && greetingIndex >= 0 ? (flatMemes[greetingIndex] ?? null) : null;
 
   // Poll video-status for the currently displayed greeting (triggers DB update → real-time → loadGameData)
   useEffect(() => {
@@ -285,15 +315,12 @@ export default function GameScreen({ params }: PageProps) {
             <div className="flex-1 flex flex-col items-center gap-6 w-full">
               {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
               <video
-                key={currentQuestion.question_order}
-                src={`/videos/${currentQuestion.question_order}.mp4`}
+                key={videoIndex}
+                src={`/videos/${videoIndex}.mp4`}
                 controls
                 autoPlay
-                className="w-full rounded-2xl max-h-[55vh] bg-black"
+                className="w-full rounded-2xl max-h-[70vh] bg-black"
               />
-              <div className="bg-white/20 backdrop-blur-sm rounded-3xl p-6 w-full max-w-4xl text-center">
-                <h2 className="text-3xl font-bold text-white">{currentQuestion.question_text}</h2>
-              </div>
               <div className="bg-white/20 backdrop-blur-sm rounded-2xl p-4 text-center">
                 <p className="text-white text-2xl font-bold">{answers.length} / {players.length} ענו</p>
               </div>
@@ -332,6 +359,26 @@ export default function GameScreen({ params }: PageProps) {
         </div>
       )}
 
+      {/* Video Revealed — question shown after video */}
+      {(game.status === 'video_revealed') && currentQuestion && (
+        <div className="flex-1 flex flex-col items-center gap-8">
+          <div className="bg-white/20 backdrop-blur-sm rounded-3xl p-8 w-full max-w-4xl text-center" dir="rtl">
+            <p className="text-pink-200 text-xl mb-2">שאלה {currentQuestion.question_order}</p>
+            <h2 className="text-4xl font-bold text-white">{currentQuestion.question_text}</h2>
+          </div>
+          <div className="grid grid-cols-2 gap-4 w-full max-w-4xl">
+            {(currentQuestion.options as string[]).map((opt: string) => (
+              <div key={opt} className="bg-white/20 backdrop-blur-sm rounded-2xl p-4 text-center">
+                <p className="text-white text-2xl font-bold">{opt}</p>
+              </div>
+            ))}
+          </div>
+          <div className="bg-white/20 backdrop-blur-sm rounded-2xl p-4 text-center">
+            <p className="text-white text-2xl font-bold">{answers.length} / {players.length} ענו</p>
+          </div>
+        </div>
+      )}
+
       {/* Answer Revealed */}
       {game.status === 'answer_revealed' && currentQuestion && (
         <div className="flex-1 flex flex-col items-center gap-6 w-full max-w-3xl mx-auto">
@@ -362,46 +409,40 @@ export default function GameScreen({ params }: PageProps) {
               </div>
             </div>
           ) : isMemeQuestion ? (
-            // Show meme gallery — carousel through each player's memes
             <div className="flex-1 flex flex-col items-center justify-center w-full gap-6">
-              {greetingIndex < 0 || !answers[greetingIndex] ? (
+              {greetingIndex < 0 || !activeMeme ? (
                 <div className="text-center">
                   <p className="text-5xl mb-4">😂</p>
                   <p className="text-pink-200 text-2xl animate-pulse">ממתינים לממים...</p>
                 </div>
-              ) : (() => {
-                const playerAnswer = answers[greetingIndex];
-                const pName = players.find(p => p.id === playerAnswer.player_id)?.display_name ?? '?';
-                let memes: { imageUrl: string; caption: string }[] = [];
-                try { memes = JSON.parse(playerAnswer.answer_value); } catch { /* ignore */ }
-                return (
-                  <>
-                    <div className="text-center">
-                      <p className="text-pink-200 text-lg">{greetingIndex + 1} / {answers.length}</p>
-                      <p className="text-white text-3xl font-bold mt-1">{pName}</p>
-                    </div>
-                    <div className="flex gap-4 overflow-x-auto w-full pb-2">
-                      {memes.map((m, i) => (
-                        <div key={i} className="flex-shrink-0 relative rounded-2xl overflow-hidden bg-black" style={{ width: 280, height: 280 }}>
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={m.imageUrl} alt="מם" className="w-full h-full object-contain" />
-                          {m.caption && (
-                            <div className="absolute bottom-0 left-0 right-0 bg-black/80 text-white text-center font-bold text-lg p-2">
-                              {m.caption}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                    {(playerAnswer.base_score ?? 0) > 0 && (
-                      <div className="bg-yellow-400/30 border-2 border-yellow-400 rounded-2xl px-8 py-4 text-center">
-                        <p className="text-yellow-200 text-lg">ניקוד</p>
-                        <p className="text-white text-6xl font-bold">{Math.round((playerAnswer.base_score ?? 0) / 100)}<span className="text-3xl text-yellow-200">/10</span></p>
+              ) : greetingIndex >= flatMemes.length ? (
+                <div className="text-center">
+                  <p className="text-5xl mb-4">🏆</p>
+                  <p className="text-white text-2xl">כל הממים הוצגו!</p>
+                </div>
+              ) : (
+                <>
+                  <div className="text-center">
+                    <p className="text-pink-200 text-lg">{greetingIndex + 1} / {flatMemes.length}</p>
+                    <p className="text-white text-3xl font-bold mt-1">{activeMeme.playerName}</p>
+                  </div>
+                  <div className="relative rounded-2xl overflow-hidden bg-black w-full max-w-2xl" style={{ maxHeight: '55vh' }}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={activeMeme.imageUrl} alt="מם" className="w-full h-full object-contain" style={{ maxHeight: '55vh' }} />
+                    {activeMeme.caption && (
+                      <div className="absolute bottom-0 left-0 right-0 bg-black/80 text-white text-center font-bold text-2xl p-3">
+                        {activeMeme.caption}
                       </div>
                     )}
-                  </>
-                );
-              })()}
+                  </div>
+                  {activeMeme.score !== undefined && (
+                    <div className="bg-yellow-400/30 border-2 border-yellow-400 rounded-2xl px-8 py-4 text-center">
+                      <p className="text-yellow-200 text-lg">ניקוד</p>
+                      <p className="text-white text-6xl font-bold">{activeMeme.score}<span className="text-3xl text-yellow-200">/10</span></p>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           ) : isDrawingQuestion ? (
             <div className="flex-1 flex flex-col items-center justify-center w-full gap-6">

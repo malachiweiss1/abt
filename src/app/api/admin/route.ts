@@ -75,6 +75,14 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ success: true });
       }
 
+      case 'reveal_video_question': {
+        await supabase
+          .from('games')
+          .update({ status: 'video_revealed', updated_at: new Date().toISOString() })
+          .eq('id', game.id);
+        return NextResponse.json({ success: true });
+      }
+
       case 'reveal_answer': {
         await supabase
           .from('games')
@@ -197,17 +205,34 @@ export async function POST(request: NextRequest) {
       }
 
       case 'greeting_next': {
-        // Count only non-skipped answers so carousel index matches filtered list
-        const { count } = await supabase
-          .from('answers')
-          .select('*', { count: 'exact', head: true })
-          .eq('question_id', game.current_question_id)
-          .neq('answer_value', '__skip__');
-        const total = count ?? 0;
-        // Read current index via RPC (bypasses schema cache)
+        // For meme_contest, total = number of individual memes across all submissions
+        let total = 0;
+        const { data: currentQData } = await supabase
+          .from('questions')
+          .select('question_type')
+          .eq('id', game.current_question_id)
+          .single();
+
+        if (currentQData?.question_type === 'meme_contest') {
+          const { data: memeAnswers } = await supabase
+            .from('answers')
+            .select('answer_value')
+            .eq('question_id', game.current_question_id)
+            .neq('answer_value', '__skip__');
+          for (const a of (memeAnswers ?? [])) {
+            try { total += JSON.parse(a.answer_value).length; } catch { /* ignore */ }
+          }
+        } else {
+          const { count } = await supabase
+            .from('answers')
+            .select('*', { count: 'exact', head: true })
+            .eq('question_id', game.current_question_id)
+            .neq('answer_value', '__skip__');
+          total = count ?? 0;
+        }
+
         const { data: currentIdx } = await supabase.rpc('get_greeting_index', { p_game_id: game.id });
         const current = (currentIdx as number) ?? -1;
-        // Allow going to `total` (one past end) so "all done" state can be shown
         const next = current < 0 ? 0 : Math.min(current + 1, total);
         await supabase.rpc('set_greeting_index', { p_game_id: game.id, p_index: next });
         return NextResponse.json({ success: true });
@@ -273,6 +298,49 @@ export async function POST(request: NextRequest) {
         await supabase
           .from('players')
           .update({ total_score: currentTotal + points })
+          .eq('id', answer.player_id);
+
+        return NextResponse.json({ success: true });
+      }
+
+      case 'score_meme': {
+        const answerId = body.answerId as string;
+        const memeIndex = body.memeIndex as number;
+        const score = body.score as number;
+
+        const { data: answer, error: answerError } = await supabase
+          .from('answers')
+          .select('player_id, base_score, answer_value')
+          .eq('id', answerId)
+          .single();
+
+        if (answerError || !answer) {
+          return NextResponse.json({ error: 'תשובה לא נמצאה' }, { status: 404 });
+        }
+
+        let memes: Array<{ imageUrl: string; caption: string; score?: number }> = [];
+        try { memes = JSON.parse(answer.answer_value); } catch { /* ignore */ }
+
+        memes[memeIndex] = { ...memes[memeIndex], score };
+
+        const newBaseScore = memes.reduce((sum, m) => sum + (m.score ?? 0), 0) * 100;
+        const diff = newBaseScore - (answer.base_score ?? 0);
+
+        await supabase
+          .from('answers')
+          .update({ answer_value: JSON.stringify(memes), base_score: newBaseScore, total_score: newBaseScore })
+          .eq('id', answerId);
+
+        const { data: playerData } = await supabase
+          .from('players')
+          .select('total_score')
+          .eq('id', answer.player_id)
+          .single();
+
+        const currentTotal = playerData?.total_score ?? 0;
+        await supabase
+          .from('players')
+          .update({ total_score: currentTotal + diff })
           .eq('id', answer.player_id);
 
         return NextResponse.json({ success: true });

@@ -412,7 +412,7 @@ export default function PlayerScreen({ params }: PageProps) {
   }
 
   // QUESTION ACTIVE
-  if (game.status === 'question_active' && currentQuestion) {
+  if ((game.status === 'question_active' || game.status === 'video_revealed') && currentQuestion) {
     const isGreeting = currentQuestion.question_type === 'free_text_greeting';
     const isDrawing = currentQuestion.question_type === 'drawing_contest';
     const isImageContest = currentQuestion.question_type === 'ai_image_contest';
@@ -716,6 +716,14 @@ export default function PlayerScreen({ params }: PageProps) {
               )}
             </div>
           )
+        ) : isVideo && game.status === 'question_active' && !submitted ? (
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-center space-y-4">
+              <div className="text-5xl">📺</div>
+              <p className="text-white text-2xl font-bold">צפו במסך הגדול!</p>
+              <p className="text-pink-200">השאלה תופיע בקרוב...</p>
+            </div>
+          </div>
         ) : submitted ? (
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center space-y-4">

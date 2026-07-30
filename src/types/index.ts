@@ -1,4 +1,4 @@
-export type GameStatus = 'waiting' | 'question_active' | 'answer_revealed' | 'leaderboard' | 'finished';
+export type GameStatus = 'waiting' | 'question_active' | 'video_revealed' | 'answer_revealed' | 'leaderboard' | 'finished';
 
 export interface Game {
   id: string;
