@@ -60,6 +60,9 @@ export async function POST(request: NextRequest) {
           return NextResponse.json({ error: 'אין שאלות נוספות' }, { status: 400 });
         }
 
+        // Reset greeting_index so carousel always starts from beginning
+        await supabase.rpc('set_greeting_index', { p_game_id: game.id, p_index: -1 });
+
         await supabase
           .from('games')
           .update({
@@ -101,6 +104,9 @@ export async function POST(request: NextRequest) {
             .eq('id', game.id);
           return NextResponse.json({ success: true, finished: true });
         }
+
+        // Reset greeting_index so carousel always starts from beginning on next question
+        await supabase.rpc('set_greeting_index', { p_game_id: game.id, p_index: -1 });
 
         await supabase
           .from('games')
@@ -191,15 +197,18 @@ export async function POST(request: NextRequest) {
       }
 
       case 'greeting_next': {
+        // Count only non-skipped answers so carousel index matches filtered list
         const { count } = await supabase
           .from('answers')
           .select('*', { count: 'exact', head: true })
-          .eq('question_id', game.current_question_id);
+          .eq('question_id', game.current_question_id)
+          .neq('answer_value', '__skip__');
         const total = count ?? 0;
         // Read current index via RPC (bypasses schema cache)
         const { data: currentIdx } = await supabase.rpc('get_greeting_index', { p_game_id: game.id });
         const current = (currentIdx as number) ?? -1;
-        const next = current < 0 ? 0 : Math.min(current + 1, total - 1);
+        // Allow going to `total` (one past end) so "all done" state can be shown
+        const next = current < 0 ? 0 : Math.min(current + 1, total);
         await supabase.rpc('set_greeting_index', { p_game_id: game.id, p_index: next });
         return NextResponse.json({ success: true });
       }

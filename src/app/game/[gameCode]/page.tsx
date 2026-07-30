@@ -119,14 +119,18 @@ export default function GameScreen({ params }: PageProps) {
   const greetingIndex = game?.greeting_index ?? -1;
 
   const sortedGreetingAnswers = isGreetingQuestion
-    ? [...answers].sort((a, b) => new Date(a.submitted_at).getTime() - new Date(b.submitted_at).getTime())
+    ? [...answers]
+        .filter(a => a.answer_value !== '__skip__')
+        .sort((a, b) => new Date(a.submitted_at).getTime() - new Date(b.submitted_at).getTime())
     : [];
 
   const activeAnswer = greetingIndex >= 0 ? (sortedGreetingAnswers[greetingIndex] ?? null) : null;
 
-  // Drawing / AI image contest computed vars
+  // Drawing / AI image contest computed vars (filter skipped submissions)
   const sortedDrawingAnswers = (isDrawingQuestion || isImageContestQuestion)
-    ? [...answers].sort((a, b) => new Date(a.submitted_at).getTime() - new Date(b.submitted_at).getTime())
+    ? [...answers]
+        .filter(a => a.answer_value !== '__skip__')
+        .sort((a, b) => new Date(a.submitted_at).getTime() - new Date(b.submitted_at).getTime())
     : [];
 
   const activeDrawingAnswer = greetingIndex >= 0 ? (sortedDrawingAnswers[greetingIndex] ?? null) : null;

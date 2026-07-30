@@ -170,39 +170,43 @@ export default function AdminScreen({ params }: PageProps) {
   const isImageQuestion = isDrawingQuestion || isImageContestQuestion || isMemeQuestion;
   const greetingIndex = game?.greeting_index ?? -1;
 
-  // Parse greeting answers for the controller list
+  // Parse greeting answers for the controller list (skip blank submissions)
   const greetingAnswers = isGreetingQuestion
-    ? answers.map(a => {
-        let text = a.answer_value;
-        const playerName = players.find(p => p.id === a.player_id)?.display_name ?? '?';
-        try {
-          const parsed = JSON.parse(a.answer_value);
-          if (parsed?.text) text = parsed.text;
-        } catch { /* plain text */ }
-        return { id: a.id, playerName, text };
-      })
+    ? answers
+        .filter(a => a.answer_value !== '__skip__')
+        .map(a => {
+          let text = a.answer_value;
+          const playerName = players.find(p => p.id === a.player_id)?.display_name ?? '?';
+          try {
+            const parsed = JSON.parse(a.answer_value);
+            if (parsed?.text) text = parsed.text;
+          } catch { /* plain text */ }
+          return { id: a.id, playerName, text };
+        })
     : [];
 
-  // Drawing / AI image / meme contest computed vars
+  // Drawing / AI image / meme contest computed vars (skip blank submissions)
   const drawingAnswers = isImageQuestion
-    ? answers.map(a => {
-        // For meme, preview = first image; for drawing/AI = the URL directly
-        let previewUrl = a.answer_value;
-        if (isMemeQuestion) {
-          try {
-            const memes = JSON.parse(a.answer_value);
-            previewUrl = memes[0]?.imageUrl ?? '';
-          } catch { /* ignore */ }
-        }
-        return {
-          id: a.id,
-          playerId: a.player_id,
-          playerName: players.find(p => p.id === a.player_id)?.display_name ?? '?',
-          imageUrl: previewUrl,
-          scored: (a.base_score ?? 0) > 0,
-          scoreValue: Math.round((a.base_score ?? 0) / 100),
-        };
-      })
+    ? answers
+        .filter(a => a.answer_value !== '__skip__')
+        .map(a => {
+          // For meme, preview = first image; for drawing/AI = the URL directly
+          let previewUrl = a.answer_value;
+          if (isMemeQuestion) {
+            try {
+              const memes = JSON.parse(a.answer_value);
+              previewUrl = memes[0]?.imageUrl ?? '';
+            } catch { /* ignore */ }
+          }
+          return {
+            id: a.id,
+            playerId: a.player_id,
+            playerName: players.find(p => p.id === a.player_id)?.display_name ?? '?',
+            imageUrl: previewUrl,
+            scored: (a.base_score ?? 0) > 0,
+            scoreValue: Math.round((a.base_score ?? 0) / 100),
+          };
+        })
     : [];
 
   const currentDrawing = greetingIndex >= 0 ? (drawingAnswers[greetingIndex] ?? null) : null;
@@ -288,7 +292,7 @@ export default function AdminScreen({ params }: PageProps) {
             <div className="flex items-center justify-between">
               <h2 className="text-white font-bold text-lg">{isDrawingQuestion ? '🎨 ניקוד ציורים' : isMemeQuestion ? '😂 ניקוד ממים' : '🤖 ניקוד תמונות AI'}</h2>
               <span className="text-yellow-300 font-bold text-lg">
-                {greetingIndex < 0 ? 'טרם התחיל' : `${greetingIndex + 1} / ${drawingAnswers.length}`}
+                {greetingIndex < 0 ? 'טרם התחיל' : greetingIndex >= drawingAnswers.length ? 'סיום' : `${greetingIndex + 1} / ${drawingAnswers.length}`}
               </span>
             </div>
 
@@ -300,15 +304,22 @@ export default function AdminScreen({ params }: PageProps) {
               >
                 ▶ התחל סיור ציורים
               </button>
-            ) : allDrawingsScored && greetingIndex >= drawingAnswers.length ? (
+            ) : greetingIndex >= drawingAnswers.length ? (
               <div className="space-y-3">
-                <div className="text-center text-white text-xl">✅ כל הציורים נוקדו!</div>
+                <div className="text-center text-white text-xl">✅ כל הציורים הוצגו!</div>
                 <button
                   onClick={() => doAction('show_leaderboard')}
                   disabled={loading}
                   className="w-full bg-purple-500 hover:bg-purple-600 disabled:opacity-50 text-white font-bold py-4 rounded-xl text-lg"
                 >
                   הצג דירוג
+                </button>
+                <button
+                  onClick={() => doAction('greeting_restart')}
+                  disabled={loading}
+                  className="w-full bg-white/20 hover:bg-white/30 disabled:opacity-30 text-white font-bold py-2 rounded-xl"
+                >
+                  🔄 חזור להתחלה
                 </button>
               </div>
             ) : currentDrawing ? (
@@ -321,17 +332,26 @@ export default function AdminScreen({ params }: PageProps) {
                   className="w-full rounded-xl max-h-48 object-contain bg-white"
                 />
 
+                {/* Navigation row — always visible */}
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    onClick={() => doAction('greeting_prev')}
+                    disabled={loading || greetingIndex <= 0}
+                    className="bg-white/20 hover:bg-white/30 disabled:opacity-30 text-white font-bold py-3 rounded-xl text-lg"
+                  >
+                    ⏮ הקודם
+                  </button>
+                  <button
+                    onClick={() => doAction('greeting_next')}
+                    disabled={loading}
+                    className="bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white font-bold py-3 rounded-xl text-lg"
+                  >
+                    {greetingIndex >= drawingAnswers.length - 1 ? '✓ סיום' : 'הבא ⏭'}
+                  </button>
+                </div>
+
                 {currentDrawing.scored ? (
-                  <div className="space-y-3">
-                    <p className="text-yellow-300 text-center text-lg font-bold">ניקוד: {currentDrawing.scoreValue}/10</p>
-                    <button
-                      onClick={() => doAction('greeting_next')}
-                      disabled={loading}
-                      className="w-full bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white font-bold py-3 rounded-xl"
-                    >
-                      הבא ←
-                    </button>
-                  </div>
+                  <p className="text-yellow-300 text-center text-lg font-bold">ניקוד: {currentDrawing.scoreValue}/10</p>
                 ) : (
                   <div className="space-y-3">
                     <p className="text-white text-center">בחרו ניקוד:</p>
@@ -364,7 +384,6 @@ export default function AdminScreen({ params }: PageProps) {
                   </div>
                 )}
 
-                {/* Also show all scored drawings scored state and allow showing leaderboard */}
                 {allDrawingsScored && (
                   <button
                     onClick={() => doAction('show_leaderboard')}
@@ -401,7 +420,7 @@ export default function AdminScreen({ params }: PageProps) {
               >⏮</button>
               <button
                 onClick={() => doAction(greetingIndex < 0 ? 'greeting_start' : 'greeting_next')}
-                disabled={loading || greetingAnswers.length === 0}
+                disabled={loading || greetingAnswers.length === 0 || greetingIndex >= greetingAnswers.length - 1}
                 className="col-span-2 bg-green-500 hover:bg-green-600 disabled:opacity-50 text-white font-bold py-3 rounded-xl text-lg"
               >
                 {greetingIndex < 0 ? '▶ התחל' : greetingIndex >= greetingAnswers.length - 1 ? '✓ סוף' : '▶ הבא'}

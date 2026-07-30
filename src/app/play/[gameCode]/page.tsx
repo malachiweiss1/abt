@@ -618,11 +618,20 @@ export default function PlayerScreen({ params }: PageProps) {
           submitted || imageApproved ? (
             <div className="flex-1 flex items-center justify-center">
               <div className="text-center space-y-4">
-                <div className="text-5xl">🤖</div>
-                <p className="text-white text-2xl font-bold">התמונה אושרה!</p>
-                {selectedImageUrl && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={selectedImageUrl} alt="תמונה שנוצרה" className="w-48 h-48 object-cover rounded-2xl mx-auto border-2 border-pink-400" />
+                {myAnswer?.answerValue === '__skip__' ? (
+                  <>
+                    <div className="text-5xl">🚫</div>
+                    <p className="text-white text-2xl font-bold">דילגת על המשימה</p>
+                  </>
+                ) : (
+                  <>
+                    <div className="text-5xl">🤖</div>
+                    <p className="text-white text-2xl font-bold">התמונה אושרה!</p>
+                    {selectedImageUrl && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={selectedImageUrl} alt="תמונה שנוצרה" className="w-48 h-48 object-cover rounded-2xl mx-auto border-2 border-pink-400" />
+                    )}
+                  </>
                 )}
                 <p className="text-pink-200">ממתין לשאר השחקנים...</p>
               </div>
@@ -647,6 +656,13 @@ export default function PlayerScreen({ params }: PageProps) {
                     className="w-full bg-purple-500 hover:bg-purple-600 disabled:opacity-50 text-white font-bold py-4 rounded-2xl text-xl"
                   >
                     {imageGenerating ? <span className="flex items-center justify-center gap-2"><span className="animate-spin">⚙️</span> יוצר תמונה...</span> : '✨ צור תמונה'}
+                  </button>
+                  <button
+                    onClick={() => handleSubmit('__skip__')}
+                    disabled={submitting || imageGenerating}
+                    className="w-full bg-white/10 hover:bg-white/20 disabled:opacity-50 text-white/60 font-bold py-3 rounded-2xl text-base transition-colors"
+                  >
+                    דלג על המשימה
                   </button>
                   {error && <p className="text-red-300 text-center">{error}</p>}
                 </>
@@ -688,6 +704,13 @@ export default function PlayerScreen({ params }: PageProps) {
                     <RefinementInput disabled={imageGenerating || submitting} onRefine={(t) => handleGenerateImage(t)} />
                   )}
                   {imageGenerating && <div className="text-center text-yellow-300 animate-pulse text-lg">⚙️ מתקן תמונה...</div>}
+                  <button
+                    onClick={() => handleSubmit('__skip__')}
+                    disabled={submitting || imageGenerating}
+                    className="w-full bg-white/10 hover:bg-white/20 disabled:opacity-50 text-white/60 font-bold py-3 rounded-2xl text-base transition-colors"
+                  >
+                    דלג על המשימה
+                  </button>
                   {error && <p className="text-red-300 text-center">{error}</p>}
                 </>
               )}
@@ -696,15 +719,24 @@ export default function PlayerScreen({ params }: PageProps) {
         ) : submitted ? (
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center space-y-4">
-              <div className="text-5xl">{isGreeting ? '💌' : isVideo ? '🎬' : myAnswer?.isCorrect ? '✅' : '❌'}</div>
-              <p className="text-white text-2xl font-bold">
-                {isGreeting ? 'הברכה נשלחה!' : isVideo ? 'ענית!' : myAnswer?.isCorrect ? 'כל הכבוד!' : 'אוי לא...'}
-              </p>
-              {isGreeting && myAnswer && (
-                <p className="text-pink-200 text-lg italic">&ldquo;{parseGreetingText(myAnswer.answerValue)}&rdquo;</p>
+              {isGreeting && myAnswer?.answerValue === '__skip__' ? (
+                <>
+                  <div className="text-5xl">🚫</div>
+                  <p className="text-white text-2xl font-bold">דילגת על המשימה</p>
+                </>
+              ) : (
+                <>
+                  <div className="text-5xl">{isGreeting ? '💌' : isVideo ? '🎬' : myAnswer?.isCorrect ? '✅' : '❌'}</div>
+                  <p className="text-white text-2xl font-bold">
+                    {isGreeting ? 'הברכה נשלחה!' : isVideo ? 'ענית!' : myAnswer?.isCorrect ? 'כל הכבוד!' : 'אוי לא...'}
+                  </p>
+                  {isGreeting && myAnswer && (
+                    <p className="text-pink-200 text-lg italic">&ldquo;{parseGreetingText(myAnswer.answerValue)}&rdquo;</p>
+                  )}
+                  {videoStatus === 'starting' && <p className="text-yellow-300 text-sm animate-pulse">מכין את הוידאו שלך...</p>}
+                  {videoStatus === 'generating' && <p className="text-green-300 text-sm animate-pulse">✨ הוידאו שלך בדרך!</p>}
+                </>
               )}
-              {videoStatus === 'starting' && <p className="text-yellow-300 text-sm animate-pulse">מכין את הוידאו שלך...</p>}
-              {videoStatus === 'generating' && <p className="text-green-300 text-sm animate-pulse">✨ הוידאו שלך בדרך!</p>}
               <p className="text-pink-200">ממתין לשאר השחקנים...</p>
             </div>
           </div>
@@ -759,6 +791,13 @@ export default function PlayerScreen({ params }: PageProps) {
               className="w-full bg-pink-500 hover:bg-pink-600 disabled:opacity-50 text-white font-bold py-4 rounded-2xl text-xl transition-colors"
             >
               {submitting ? 'שולח...' : '💌 שלח ברכה'}
+            </button>
+            <button
+              onClick={() => handleSubmit('__skip__')}
+              disabled={submitting}
+              className="w-full bg-white/10 hover:bg-white/20 disabled:opacity-50 text-white/60 font-bold py-3 rounded-2xl text-base transition-colors"
+            >
+              דלג על המשימה
             </button>
             {error && <p className="text-red-300 text-center">{error}</p>}
           </div>
