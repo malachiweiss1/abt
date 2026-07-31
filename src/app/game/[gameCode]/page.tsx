@@ -20,6 +20,7 @@ export default function GameScreen({ params }: PageProps) {
   const [error, setError] = useState<string | null>(null);
   const [origin, setOrigin] = useState('');
   const [tfTimeLeft, setTfTimeLeft] = useState(60);
+  const [tfCountdown, setTfCountdown] = useState(0);
   const [videoBlocked, setVideoBlocked] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const videoPollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -105,18 +106,23 @@ export default function GameScreen({ params }: PageProps) {
     };
   }, [gameCode, loadGameData, supabase]);
 
-  // True/false countdown timer on game screen
+  // True/false countdown timer on game screen (includes 5-second pre-start countdown)
   useEffect(() => {
     if (currentQuestion?.question_type !== 'true_false_rapid') return;
     if (game?.status !== 'question_active') return;
     if (!game?.question_started_at) return;
 
+    const startedAt = new Date(game.question_started_at!).getTime();
+    const PRE_START = 5; // seconds of countdown before TF begins
+
     const tick = () => {
-      const elapsed = Math.floor((Date.now() - new Date(game.question_started_at!).getTime()) / 1000);
-      setTfTimeLeft(Math.max(0, 45 - elapsed));
+      const elapsed = (Date.now() - startedAt) / 1000;
+      const remaining = PRE_START - elapsed;
+      setTfCountdown(remaining > 0 ? Math.ceil(remaining) : 0);
+      setTfTimeLeft(Math.max(0, 45 - Math.max(0, elapsed - PRE_START)));
     };
     tick();
-    const id = setInterval(tick, 500);
+    const id = setInterval(tick, 100);
     return () => clearInterval(id);
   }, [currentQuestion?.question_type, game?.status, game?.question_started_at]);
 
@@ -300,6 +306,14 @@ export default function GameScreen({ params }: PageProps) {
       {game.status === 'question_active' && currentQuestion && (
         <div className="flex-1 flex flex-col items-center gap-8">
           {isTrueFalseQuestion ? (
+            tfCountdown > 0 ? (
+              <div className="flex-1 flex flex-col items-center justify-center gap-6">
+                <p className="text-white text-3xl font-bold">✅ נכון / לא נכון — מתחיל בעוד</p>
+                <div className="text-[12rem] font-bold tabular-nums text-yellow-300 leading-none animate-pulse">
+                  {tfCountdown}
+                </div>
+              </div>
+            ) : (
             <div className="flex-1 flex flex-col items-center justify-center gap-8">
               <div className={`text-9xl font-bold tabular-nums ${tfTimeLeft > 20 ? 'text-green-300' : tfTimeLeft > 10 ? 'text-yellow-300' : 'text-red-400 animate-pulse'}`}>
                 {tfTimeLeft}
@@ -315,6 +329,7 @@ export default function GameScreen({ params }: PageProps) {
                 <p className="text-white text-3xl font-bold">{answers.length} / {players.length} סיימו</p>
               </div>
             </div>
+            )
           ) : isMemeQuestion ? (
             <div className="flex-1 flex flex-col items-center justify-center gap-6">
               <p className="text-white text-6xl font-bold text-center">😂</p>

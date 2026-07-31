@@ -76,6 +76,7 @@ export default function PlayerScreen({ params }: PageProps) {
   const [tfAnswers, setTfAnswers] = useState<string[]>([]);
   const [tfCurrentIdx, setTfCurrentIdx] = useState(0);
   const [tfTimeLeft, setTfTimeLeft] = useState(TF_TIME_LIMIT);
+  const [tfPreCountdown, setTfPreCountdown] = useState(0);
   const tfSubmittedRef = useRef(false);
 
   // Meme contest state
@@ -189,15 +190,21 @@ export default function PlayerScreen({ params }: PageProps) {
     return () => { supabase.removeChannel(channel); };
   }, [gameCode, player?.id, loadGame, supabase]);
 
-  // True/false countdown timer
+  // True/false countdown timer (with 5-second pre-start countdown)
   useEffect(() => {
     if (currentQuestion?.question_type !== 'true_false_rapid') return;
     if (submitted || tfSubmittedRef.current) return;
     if (!game?.question_started_at) return;
 
+    const startedAt = new Date(game.question_started_at!).getTime();
+    const PRE_START = 5;
+
     const tick = () => {
-      const elapsed = Math.floor((Date.now() - new Date(game.question_started_at!).getTime()) / 1000);
-      const remaining = Math.max(0, TF_TIME_LIMIT - elapsed);
+      const elapsed = (Date.now() - startedAt) / 1000;
+      const preRemaining = Math.max(0, PRE_START - elapsed);
+      setTfPreCountdown(Math.ceil(preRemaining));
+      const tfElapsed = Math.max(0, elapsed - PRE_START);
+      const remaining = Math.max(0, TF_TIME_LIMIT - tfElapsed);
       setTfTimeLeft(remaining);
       if (remaining === 0 && !tfSubmittedRef.current) {
         autoSubmitTrueFalse();
@@ -205,7 +212,7 @@ export default function PlayerScreen({ params }: PageProps) {
     };
 
     tick();
-    const id = setInterval(tick, 500);
+    const id = setInterval(tick, 100);
     return () => clearInterval(id);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentQuestion?.question_type, submitted, game?.question_started_at]);
@@ -432,6 +439,17 @@ export default function PlayerScreen({ params }: PageProps) {
       const tfQ = TRUE_FALSE_QUESTIONS[tfCurrentIdx];
       const isDone = submitted || tfSubmittedRef.current || tfAnswers.length >= TRUE_FALSE_QUESTIONS.length;
       const timerColor = tfTimeLeft > 20 ? 'text-green-300' : tfTimeLeft > 10 ? 'text-yellow-300' : 'text-red-400';
+
+      if (tfPreCountdown > 0) {
+        return (
+          <div className="min-h-screen flex flex-col items-center justify-center gap-6" dir="rtl">
+            <p className="text-white text-2xl font-bold">✅ נכון / לא נכון — מתחיל בעוד</p>
+            <div className="text-[10rem] font-bold tabular-nums text-yellow-300 leading-none animate-pulse">
+              {tfPreCountdown}
+            </div>
+          </div>
+        );
+      }
 
       return (
         <div className="min-h-screen p-4 flex flex-col" dir="rtl">
