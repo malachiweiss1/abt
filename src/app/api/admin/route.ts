@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
 
     const { data: questions } = await supabase
       .from('questions')
-      .select('id, question_order')
+      .select('id, question_order, question_type')
       .eq('game_id', game.id)
       .order('question_order');
 
