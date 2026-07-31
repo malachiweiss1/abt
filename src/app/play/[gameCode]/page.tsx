@@ -78,11 +78,15 @@ export default function PlayerScreen({ params }: PageProps) {
   const [tfTimeLeft, setTfTimeLeft] = useState(TF_TIME_LIMIT);
   const [tfPreCountdown, setTfPreCountdown] = useState(0);
   const tfSubmittedRef = useRef(false);
+  const tfAnswersRef = useRef<string[]>([]);
 
   // Meme contest state
   const [memeCaptions, setMemeCaptions] = useState<Record<string, string>>({});
   const [memeImageIdx, setMemeImageIdx] = useState(0);
   const [memeSubmitted, setMemeSubmitted] = useState(false);
+
+  // Keep tfAnswersRef in sync so autoSubmitTrueFalse never reads stale state
+  useEffect(() => { tfAnswersRef.current = tfAnswers; }, [tfAnswers]);
 
   const playerRef = useRef<Player | null>(null);
   const currentQuestionRef = useRef<Question | null>(null);
@@ -231,12 +235,12 @@ export default function PlayerScreen({ params }: PageProps) {
   const autoSubmitTrueFalse = useCallback(() => {
     if (tfSubmittedRef.current || !playerRef.current || !currentQuestionRef.current) return;
     tfSubmittedRef.current = true;
-    const answers = tfAnswers;
+    const answers = tfAnswersRef.current;
     const correctCount = answers.filter((a, i) => a === TRUE_FALSE_QUESTIONS[i]?.a).length;
     const value = JSON.stringify({ answers, correctCount });
     handleSubmitDirect(value, currentQuestionRef.current.id, playerRef.current.id);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tfAnswers]);
+  }, []);
 
   const handleJoin = async () => {
     if (!nameInput.trim()) { setError('נא להזין שם'); return; }

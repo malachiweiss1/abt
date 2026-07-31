@@ -274,7 +274,7 @@ export default function AdminScreen({ params }: PageProps) {
           {game?.status === 'waiting' && (
             <button onClick={() => doAction('start_question')} disabled={loading}
               className="w-full bg-green-500 hover:bg-green-600 disabled:opacity-50 text-white font-bold py-4 rounded-xl text-lg">
-              הצג שאלה
+              התחל משחק
             </button>
           )}
 
