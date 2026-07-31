@@ -102,6 +102,17 @@ export default function PlayerScreen({ params }: PageProps) {
     }
     setGame(gameData);
 
+    // Refresh player score from DB so mobile matches main screen
+    const pid = playerId || playerRef.current?.id;
+    if (pid) {
+      const { data: updatedPlayer } = await supabase
+        .from('players').select('*').eq('id', pid).single();
+      if (updatedPlayer) {
+        setPlayer(updatedPlayer);
+        playerRef.current = updatedPlayer;
+      }
+    }
+
     if (gameData.current_question_id) {
       const { data: q } = await supabase
         .from('questions')
@@ -205,7 +216,7 @@ export default function PlayerScreen({ params }: PageProps) {
       setTfPreCountdown(Math.ceil(preRemaining));
       const tfElapsed = Math.max(0, elapsed - PRE_START);
       const remaining = Math.max(0, TF_TIME_LIMIT - tfElapsed);
-      setTfTimeLeft(remaining);
+      setTfTimeLeft(Math.floor(remaining));
       if (remaining === 0 && !tfSubmittedRef.current) {
         autoSubmitTrueFalse();
       }
@@ -414,6 +425,17 @@ export default function PlayerScreen({ params }: PageProps) {
             ))}
           </div>
         </div>
+      </div>
+    );
+  }
+
+  // VIDEO INTRO
+  if (game.status === 'video_intro') {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-6" dir="rtl">
+        <div className="text-7xl">🎬</div>
+        <h2 className="text-3xl font-bold text-white">סרטון בדרך...</h2>
+        <p className="text-pink-200 text-xl">הסתכלו על המסך הגדול</p>
       </div>
     );
   }

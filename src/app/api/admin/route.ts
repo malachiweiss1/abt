@@ -63,14 +63,23 @@ export async function POST(request: NextRequest) {
         // Reset greeting_index so carousel always starts from beginning
         await supabase.rpc('set_greeting_index', { p_game_id: game.id, p_index: -1 });
 
+        const isVideo = nextQuestion.question_type === 'video_question';
         await supabase
           .from('games')
           .update({
-            status: 'question_active',
+            status: isVideo ? 'video_intro' : 'question_active',
             current_question_id: nextQuestion.id,
             question_started_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           })
+          .eq('id', game.id);
+        return NextResponse.json({ success: true });
+      }
+
+      case 'continue_video': {
+        await supabase
+          .from('games')
+          .update({ status: 'question_active', question_started_at: new Date().toISOString(), updated_at: new Date().toISOString() })
           .eq('id', game.id);
         return NextResponse.json({ success: true });
       }
@@ -117,10 +126,11 @@ export async function POST(request: NextRequest) {
         // Reset greeting_index so carousel always starts from beginning on next question
         await supabase.rpc('set_greeting_index', { p_game_id: game.id, p_index: -1 });
 
+        const isNextVideo = nextQuestion.question_type === 'video_question';
         await supabase
           .from('games')
           .update({
-            status: 'question_active',
+            status: isNextVideo ? 'video_intro' : 'question_active',
             current_question_id: nextQuestion.id,
             question_started_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),

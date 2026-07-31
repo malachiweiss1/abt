@@ -156,6 +156,7 @@ export default function AdminScreen({ params }: PageProps) {
   const statusLabels: Record<string, string> = {
     waiting: 'ממתין',
     question_active: 'שאלה פעילה',
+    video_intro: 'מסך פתיחה סרטון',
     video_revealed: 'שאלה על הסרטון',
     answer_revealed: 'תשובה נחשפה',
     leaderboard: 'טבלת מובילים',
@@ -256,7 +257,7 @@ export default function AdminScreen({ params }: PageProps) {
     <div className="min-h-screen p-4" dir="rtl">
       <div className="max-w-2xl mx-auto space-y-4">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-white">🎛️ לוח בקרה - {gameCode}</h1>
+          <h1 className="text-2xl font-bold text-white">🎛️ לוח בקרה</h1>
           <p className="text-pink-200">
             סטטוס: <span className="font-bold text-yellow-300">{statusLabels[game?.status || 'waiting']}</span>
           </p>
@@ -274,6 +275,13 @@ export default function AdminScreen({ params }: PageProps) {
             <button onClick={() => doAction('start_question')} disabled={loading}
               className="w-full bg-green-500 hover:bg-green-600 disabled:opacity-50 text-white font-bold py-4 rounded-xl text-lg">
               הצג שאלה
+            </button>
+          )}
+
+          {game?.status === 'video_intro' && (
+            <button onClick={() => doAction('continue_video')} disabled={loading}
+              className="w-full bg-green-500 hover:bg-green-600 disabled:opacity-50 text-white font-bold py-4 rounded-xl text-lg">
+              ▶ המשך — הפעל סרטון
             </button>
           )}
 
@@ -320,7 +328,9 @@ export default function AdminScreen({ params }: PageProps) {
             </button>
           )}
 
-          <button onClick={() => doAction('reset_game')} disabled={loading}
+          <button
+            onClick={() => { if (confirm('לאפס את המשחק? הניקוד והשאלות יאופסו.')) { doAction('reset_game'); } }}
+            disabled={loading}
             className="w-full bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-bold py-3 rounded-xl">
             אפס משחק
           </button>

@@ -119,7 +119,7 @@ export default function GameScreen({ params }: PageProps) {
       const elapsed = (Date.now() - startedAt) / 1000;
       const remaining = PRE_START - elapsed;
       setTfCountdown(remaining > 0 ? Math.ceil(remaining) : 0);
-      setTfTimeLeft(Math.max(0, 45 - Math.max(0, elapsed - PRE_START)));
+      setTfTimeLeft(Math.floor(Math.max(0, 45 - Math.max(0, elapsed - PRE_START))));
     };
     tick();
     const id = setInterval(tick, 100);
@@ -271,7 +271,6 @@ export default function GameScreen({ params }: PageProps) {
       {/* Header */}
       <div className="text-center mb-6">
         <h1 className="text-5xl font-bold text-white mb-2">🎂 כמה אתם מכירים את אביה? 🎂</h1>
-        <p className="text-pink-200 text-2xl">קוד משחק: {gameCode}</p>
       </div>
 
       {/* Waiting State */}
@@ -299,6 +298,15 @@ export default function GameScreen({ params }: PageProps) {
               <p className="text-pink-200 text-xl text-center">ממתין לשחקנים...</p>
             )}
           </div>
+        </div>
+      )}
+
+      {/* Video Intro — shown before each video question */}
+      {game.status === 'video_intro' && (
+        <div className="flex-1 flex flex-col items-center justify-center gap-8">
+          <div className="text-[8rem] leading-none">🎬</div>
+          <h2 className="text-7xl font-bold text-white">סרטונים</h2>
+          <p className="text-2xl text-pink-200">ממתינים לאדמין...</p>
         </div>
       )}
 
