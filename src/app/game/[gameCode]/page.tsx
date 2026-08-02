@@ -6,6 +6,20 @@ import { createClient } from '@/lib/supabase/client';
 import Confetti from '@/components/Confetti';
 import type { Game, Question, Player, Answer } from '@/types';
 
+const OPEN_IMAGES = [
+  '/open_images/IMG_4876.png',
+  '/open_images/IMG_4877.png',
+  '/open_images/IMG_4878.png',
+  '/open_images/IMG_4879.png',
+  '/open_images/IMG_4880.png',
+  '/open_images/IMG_4881.png',
+  '/open_images/IMG_4882.png',
+  '/open_images/IMG_4883.png',
+  '/open_images/IMG_4884.png',
+  '/open_images/IMG_4885.png',
+  '/open_images/unnamed.png',
+];
+
 interface PageProps {
   params: Promise<{ gameCode: string }>;
 }
@@ -22,12 +36,30 @@ export default function GameScreen({ params }: PageProps) {
   const [tfTimeLeft, setTfTimeLeft] = useState(60);
   const [tfCountdown, setTfCountdown] = useState(0);
   const [videoBlocked, setVideoBlocked] = useState(false);
+  const [slideIdx, setSlideIdx] = useState(0);
+  const [musicBlocked, setMusicBlocked] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const videoPollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     setOrigin(window.location.origin);
   }, []);
+
+  // Slideshow during waiting
+  useEffect(() => {
+    if (game?.status !== 'waiting') return;
+    const id = setInterval(() => setSlideIdx(i => (i + 1) % OPEN_IMAGES.length), 4000);
+    return () => clearInterval(id);
+  }, [game?.status]);
+
+  // Background music during waiting
+  useEffect(() => {
+    if (game?.status !== 'waiting') return;
+    const audio = audioRef.current;
+    if (!audio) return;
+    audio.play().then(() => setMusicBlocked(false)).catch(() => setMusicBlocked(true));
+  }, [game?.status]);
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || origin;
   const playUrl = `${appUrl}/play/${gameCode}`;
@@ -113,7 +145,7 @@ export default function GameScreen({ params }: PageProps) {
     if (!game?.question_started_at) return;
 
     const startedAt = new Date(game.question_started_at!).getTime();
-    const PRE_START = 5; // seconds of countdown before TF begins
+    const PRE_START = 10; // seconds of countdown before TF begins
 
     const tick = () => {
       const elapsed = (Date.now() - startedAt) / 1000;
@@ -275,28 +307,50 @@ export default function GameScreen({ params }: PageProps) {
 
       {/* Waiting State */}
       {game.status === 'waiting' && (
-        <div className="flex-1 flex gap-8 items-center justify-center">
-          <div className="flex flex-col items-center gap-6">
-            <div className="bg-white p-4 rounded-2xl shadow-2xl">
-              {playUrl && <QRCodeSVG value={playUrl} size={200} />}
+        <div className="flex-1 flex gap-8 items-center justify-center relative overflow-hidden">
+          {/* Background slideshow */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            key={slideIdx}
+            src={OPEN_IMAGES[slideIdx]}
+            alt=""
+            className="absolute inset-0 w-full h-full object-cover opacity-40 transition-opacity duration-1000"
+          />
+          {/* Background music */}
+          {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+          <audio ref={audioRef} src="/music_for_open.mp3" loop />
+          {musicBlocked && (
+            <button
+              onClick={() => { audioRef.current?.play(); setMusicBlocked(false); }}
+              className="absolute top-4 left-4 z-20 bg-white/20 hover:bg-white/40 text-white rounded-xl px-4 py-2 text-sm font-bold backdrop-blur-sm"
+            >
+              ▶ הפעל מוזיקה
+            </button>
+          )}
+          {/* Content */}
+          <div className="relative z-10 flex gap-8 items-center justify-center w-full">
+            <div className="flex flex-col items-center gap-6">
+              <div className="bg-white p-4 rounded-2xl shadow-2xl">
+                {playUrl && <QRCodeSVG value={playUrl} size={200} />}
+              </div>
+              <p className="text-white text-lg text-center">סרקו להצטרפות</p>
+              <p className="text-pink-200 text-sm">{playUrl}</p>
             </div>
-            <p className="text-white text-lg text-center">סרקו להצטרפות</p>
-            <p className="text-pink-200 text-sm">{playUrl}</p>
-          </div>
-          <div className="flex flex-col gap-4">
-            <h2 className="text-white text-3xl font-bold text-center">
-              שחקנים מחוברים ({players.length})
-            </h2>
-            <div className="grid grid-cols-2 gap-3 max-h-96 overflow-y-auto">
-              {players.map(p => (
-                <div key={p.id} className="bg-white/20 rounded-xl px-4 py-2 text-white text-xl text-center backdrop-blur-sm">
-                  {p.display_name}
-                </div>
-              ))}
+            <div className="flex flex-col gap-4">
+              <h2 className="text-white text-3xl font-bold text-center">
+                שחקנים מחוברים ({players.length})
+              </h2>
+              <div className="grid grid-cols-2 gap-3 max-h-96 overflow-y-auto">
+                {players.map(p => (
+                  <div key={p.id} className="bg-white/20 rounded-xl px-4 py-2 text-white text-xl text-center backdrop-blur-sm">
+                    {p.display_name}
+                  </div>
+                ))}
+              </div>
+              {players.length === 0 && (
+                <p className="text-pink-200 text-xl text-center">ממתין לשחקנים...</p>
+              )}
             </div>
-            {players.length === 0 && (
-              <p className="text-pink-200 text-xl text-center">ממתין לשחקנים...</p>
-            )}
           </div>
         </div>
       )}
@@ -479,9 +533,9 @@ export default function GameScreen({ params }: PageProps) {
                     <p className="text-pink-200 text-lg">{greetingIndex + 1} / {flatMemes.length}</p>
                     <p className="text-white text-3xl font-bold mt-1">{activeMeme.playerName}</p>
                   </div>
-                  <div className="relative rounded-2xl overflow-hidden bg-black w-full max-w-2xl" style={{ maxHeight: '55vh' }}>
+                  <div className="relative rounded-2xl overflow-hidden w-full max-w-2xl" style={{ maxHeight: '60vh' }}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={activeMeme.imageUrl} alt="מם" className="w-full h-full object-contain" style={{ maxHeight: '55vh' }} />
+                    <img src={activeMeme.imageUrl} alt="מם" className="w-full object-cover" style={{ maxHeight: '60vh' }} />
                     {activeMeme.caption && (
                       <div className="absolute bottom-0 left-0 right-0 bg-black/80 text-white text-center font-bold text-2xl p-3">
                         {activeMeme.caption}
@@ -602,7 +656,7 @@ export default function GameScreen({ params }: PageProps) {
                     src={activeGreeting.videoUrl}
                     autoPlay
                     playsInline
-                    className="w-full rounded-2xl max-h-[60vh] bg-black"
+                    className="w-full rounded-2xl max-h-[60vh]"
                   />
                 </>
               )}

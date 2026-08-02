@@ -292,13 +292,17 @@ export default function AdminScreen({ params }: PageProps) {
             </button>
           )}
           {game?.status === 'question_active' && !isVideoQuestion && (
-            <button onClick={() => doAction('reveal_answer')} disabled={loading}
+            <button
+              onClick={() => { if (confirm('אתה בטוח? פעולה זו תעצור את הטיימר ותחשוף את התשובה.')) doAction('reveal_answer'); }}
+              disabled={loading}
               className="w-full bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white font-bold py-4 rounded-xl text-lg">
               חשוף תשובה
             </button>
           )}
           {game?.status === 'video_revealed' && (
-            <button onClick={() => doAction('reveal_answer')} disabled={loading}
+            <button
+              onClick={() => { if (confirm('אתה בטוח? חשיפת התשובה תעצור את קבלת תשובות.')) doAction('reveal_answer'); }}
+              disabled={loading}
               className="w-full bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white font-bold py-4 rounded-xl text-lg">
               חשוף תשובה
             </button>
@@ -400,13 +404,12 @@ export default function AdminScreen({ params }: PageProps) {
             ) : isMemeQuestion && activeMemeItem ? (
               <div className="space-y-3">
                 <p className="text-white text-lg font-bold text-center">{activeMemeItem.playerName}</p>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <div className="relative rounded-xl overflow-hidden bg-black">
+                <div className="relative rounded-xl overflow-hidden">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={activeMemeItem.imageUrl}
                     alt="מם"
-                    className="w-full rounded-xl max-h-56 object-contain bg-white"
+                    className="w-full rounded-xl max-h-56 object-cover"
                   />
                   {activeMemeItem.caption && (
                     <div className="absolute bottom-0 left-0 right-0 bg-black/80 text-white text-center font-bold text-lg p-2">
@@ -422,14 +425,14 @@ export default function AdminScreen({ params }: PageProps) {
                     disabled={loading || greetingIndex <= 0}
                     className="bg-white/20 hover:bg-white/30 disabled:opacity-30 text-white font-bold py-3 rounded-xl text-lg"
                   >
-                    ⏮ הקודם
+                    ⏭ הקודם
                   </button>
                   <button
                     onClick={() => doAction('greeting_next')}
                     disabled={loading}
                     className="bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white font-bold py-3 rounded-xl text-lg"
                   >
-                    {greetingIndex >= carouselLength - 1 ? '✓ סיום' : 'הבא ⏭'}
+                    {greetingIndex >= carouselLength - 1 ? '✓ סיום' : 'הבא ⏮'}
                   </button>
                 </div>
 
@@ -497,14 +500,14 @@ export default function AdminScreen({ params }: PageProps) {
                     disabled={loading || greetingIndex <= 0}
                     className="bg-white/20 hover:bg-white/30 disabled:opacity-30 text-white font-bold py-3 rounded-xl text-lg"
                   >
-                    ⏮ הקודם
+                    ⏭ הקודם
                   </button>
                   <button
                     onClick={() => doAction('greeting_next')}
                     disabled={loading}
                     className="bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white font-bold py-3 rounded-xl text-lg"
                   >
-                    {greetingIndex >= carouselLength - 1 ? '✓ סיום' : 'הבא ⏭'}
+                    {greetingIndex >= carouselLength - 1 ? '✓ סיום' : 'הבא ⏮'}
                   </button>
                 </div>
 

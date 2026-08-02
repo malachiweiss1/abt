@@ -25,17 +25,26 @@ const TRUE_FALSE_QUESTIONS = [
 
 const MEME_IMAGES = [
   '/images/02BAA7A5-0278-4FE3-A803-AEDD96291CFC.png',
-  '/images/095035FE-105D-4C70-8636-0DD142BD74E6.png',
-  '/images/12AFE045-3C02-4CC6-8AC3-C32E87F46358.png',
-  '/images/28A6E576-E4AE-4F4B-A8E7-6EDA40E9AEA4.png',
+  '/images/138c48df-137f-4f5b-900d-68f31db5272a.png',
   '/images/28E4E017-6A93-47F6-928C-1EDAD8901DE3.png',
-  '/images/5BA5B3E5-F294-46FE-B763-EAEF39D5B5CF.png',
+  '/images/3f77bd91-d072-42a0-bd5f-8044c48b0f3d.png',
   '/images/7767C9A6-CF4A-4ED9-8D3F-8BC0B4F32828.png',
-  '/images/7C7AB27B-0273-45DB-8DCF-5EE8BE78DEB5.png',
+  '/images/65e88eee-2ea1-4638-8ce2-d35cd681be47.png',
   '/images/C7B0AF51-9D92-41F2-A82A-ADD79F1A804D.png',
+  '/images/6800f6f6-e38f-4278-bac2-9b73c60b7500.png',
+  '/images/FD0670B9-1E59-4E59-B34B-E2000A7F4728.png',
+  '/images/6eb25b4a-a123-4967-8191-70bbf015add7.png',
+  '/images/095035FE-105D-4C70-8636-0DD142BD74E6.png',
+  '/images/98a4bdf5-e25a-4ffc-ad21-318d92753abf.png',
+  '/images/12AFE045-3C02-4CC6-8AC3-C32E87F46358.png',
+  '/images/e2a45328-2f27-436a-8664-a48f83184905.png',
+  '/images/28A6E576-E4AE-4F4B-A8E7-6EDA40E9AEA4.png',
+  '/images/ecd60851-2cde-4b8c-9f94-60731c13a181.png',
+  '/images/5BA5B3E5-F294-46FE-B763-EAEF39D5B5CF.png',
+  '/images/f5d7294b-a45e-473f-b785-c499eda07683.png',
+  '/images/7C7AB27B-0273-45DB-8DCF-5EE8BE78DEB5.png',
   '/images/CE6EC624-7F9D-4902-9852-0AB721C15A93.png',
   '/images/DE65CCC8-D12D-4D98-AC8E-C9FB4F657527.png',
-  '/images/FD0670B9-1E59-4E59-B34B-E2000A7F4728.png',
 ];
 
 const TF_TIME_LIMIT = 45; // seconds
@@ -61,6 +70,7 @@ export default function PlayerScreen({ params }: PageProps) {
   const [drawingSubmitted, setDrawingSubmitted] = useState(false);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [cropSrc, setCropSrc] = useState<string | null>(null);
   const [videoStatus, setVideoStatus] = useState<'idle' | 'starting' | 'generating' | 'done' | 'error'>('idle');
 
   // AI image contest state
@@ -212,7 +222,7 @@ export default function PlayerScreen({ params }: PageProps) {
     if (!game?.question_started_at) return;
 
     const startedAt = new Date(game.question_started_at!).getTime();
-    const PRE_START = 5;
+    const PRE_START = 10;
 
     const tick = () => {
       const elapsed = (Date.now() - startedAt) / 1000;
@@ -552,14 +562,14 @@ export default function PlayerScreen({ params }: PageProps) {
       return (
         <div className="min-h-screen p-4 flex flex-col" dir="rtl">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-white font-bold text-lg">😂 צרו ממים</h2>
-            <span className="text-pink-200 text-sm">{memeImageIdx + 1} / {MEME_IMAGES.length}</span>
+            <h2 className="text-white font-bold text-lg">😂 צרו ממים (עד 3)</h2>
+            <span className="text-pink-200 text-sm">{memeImageIdx + 1} / {MEME_IMAGES.length} · <span className={captionCount >= 3 ? 'text-green-300 font-bold' : ''}>{captionCount}/3 נבחרו</span></span>
           </div>
 
           {/* Image with caption preview */}
-          <div className="relative rounded-2xl overflow-hidden bg-black mb-3 flex-shrink-0" style={{ maxHeight: '45vh' }}>
+          <div className="relative rounded-2xl overflow-hidden mb-3 flex-shrink-0" style={{ maxHeight: '45vh' }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={currentImg} alt="מם" className="w-full object-contain" style={{ maxHeight: '45vh' }} />
+            <img src={currentImg} alt="מם" className="w-full object-cover" style={{ maxHeight: '45vh' }} />
             {memeCaptions[currentImg] && (
               <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-center font-bold text-xl p-3">
                 {memeCaptions[currentImg]}
@@ -570,10 +580,13 @@ export default function PlayerScreen({ params }: PageProps) {
           {/* Caption input */}
           <input
             type="text"
-            placeholder="כתבו כיתוב מצחיק..."
+            placeholder={captionCount >= 3 && !memeCaptions[currentImg]?.trim() ? 'הגעת ל-3 ממים (ערוך קיים לשינוי)' : 'כתבו כיתוב מצחיק...'}
             value={memeCaptions[currentImg] ?? ''}
-            onChange={e => setMemeCaptions(prev => ({ ...prev, [currentImg]: e.target.value }))}
-            className="w-full bg-white/20 text-white placeholder-white/60 rounded-2xl p-4 text-lg border border-white/30 focus:outline-none focus:border-white mb-3"
+            onChange={e => {
+              if (captionCount >= 3 && !memeCaptions[currentImg]?.trim()) return; // block 4th
+              setMemeCaptions(prev => ({ ...prev, [currentImg]: e.target.value }));
+            }}
+            className="w-full bg-white/20 text-white placeholder-white/60 rounded-2xl p-4 text-lg border border-white/30 focus:outline-none focus:border-white mb-3 disabled:opacity-50"
             maxLength={80}
           />
 
@@ -583,12 +596,12 @@ export default function PlayerScreen({ params }: PageProps) {
               onClick={() => setMemeImageIdx(i => Math.max(0, i - 1))}
               disabled={memeImageIdx === 0}
               className="flex-1 bg-white/20 hover:bg-white/30 disabled:opacity-30 text-white font-bold py-3 rounded-xl text-xl"
-            >⏮ הקודם</button>
+            >⏭ הקודם</button>
             <button
               onClick={() => setMemeImageIdx(i => Math.min(MEME_IMAGES.length - 1, i + 1))}
               disabled={memeImageIdx === MEME_IMAGES.length - 1}
               className="flex-1 bg-white/20 hover:bg-white/30 disabled:opacity-30 text-white font-bold py-3 rounded-xl text-xl"
-            >הבא ⏭</button>
+            >הבא ⏮</button>
           </div>
 
           {/* Dot indicators */}
@@ -609,6 +622,7 @@ export default function PlayerScreen({ params }: PageProps) {
             onClick={async () => {
               const memes = MEME_IMAGES
                 .filter(img => memeCaptions[img]?.trim())
+                .slice(0, 3)
                 .map(img => ({ imageUrl: img, caption: memeCaptions[img].trim() }));
               if (memes.length === 0) { setError('כתבו לפחות כיתוב אחד'); return; }
               setMemeSubmitted(true);
@@ -817,7 +831,24 @@ export default function PlayerScreen({ params }: PageProps) {
             </div>
             <div className="space-y-2">
               <p className="text-pink-200 text-sm text-center">📸 העלו תמונת פנים (אופציונלי — ליצירת וידאו)</p>
-              {photoPreview ? (
+              {cropSrc ? (
+                <FaceCrop
+                  src={cropSrc}
+                  onCrop={(file, preview) => {
+                    setPhotoFile(file);
+                    setPhotoPreview(preview);
+                    setCropSrc(null);
+                  }}
+                  onSkip={() => {
+                    // Use original uncropped
+                    fetch(cropSrc)
+                      .then(r => r.blob())
+                      .then(b => setPhotoFile(new File([b], 'photo.jpg', { type: b.type })));
+                    setPhotoPreview(cropSrc);
+                    setCropSrc(null);
+                  }}
+                />
+              ) : photoPreview ? (
                 <div className="relative flex justify-center">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={photoPreview} alt="תצוגה מקדימה" className="h-32 w-32 object-cover rounded-2xl border-2 border-pink-400" />
@@ -831,7 +862,7 @@ export default function PlayerScreen({ params }: PageProps) {
                   <input type="file" accept="image/*" className="hidden"
                     onChange={e => {
                       const file = e.target.files?.[0];
-                      if (file) { setPhotoFile(file); setPhotoPreview(URL.createObjectURL(file)); }
+                      if (file) setCropSrc(URL.createObjectURL(file));
                     }}
                   />
                 </label>
@@ -981,6 +1012,87 @@ export default function PlayerScreen({ params }: PageProps) {
   }
 
   return null;
+}
+
+function FaceCrop({ src, onCrop, onSkip }: { src: string; onCrop: (file: File, preview: string) => void; onSkip: () => void }) {
+  const imgRef = useRef<HTMLImageElement>(null);
+  const [cropX, setCropX] = useState(25);   // % of image width
+  const [cropY, setCropY] = useState(15);   // % of image height
+  const [cropSize, setCropSize] = useState(50); // % of image width
+  const isDraggingRef = useRef(false);
+  const dragStartRef = useRef({ px: 0, py: 0, cx: 0, cy: 0 });
+
+  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.currentTarget.setPointerCapture(e.pointerId);
+    isDraggingRef.current = true;
+    dragStartRef.current = { px: e.clientX, py: e.clientY, cx: cropX, cy: cropY };
+  };
+
+  const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isDraggingRef.current || !imgRef.current) return;
+    const rect = imgRef.current.getBoundingClientRect();
+    const dx = ((e.clientX - dragStartRef.current.px) / rect.width) * 100;
+    const dy = ((e.clientY - dragStartRef.current.py) / rect.height) * 100;
+    setCropX(Math.max(0, Math.min(100 - cropSize, dragStartRef.current.cx + dx)));
+    setCropY(Math.max(0, Math.min(100 - cropSize * (rect.width / rect.height), dragStartRef.current.cy + dy)));
+  };
+
+  const onPointerUp = () => { isDraggingRef.current = false; };
+
+  const handleConfirm = () => {
+    const img = imgRef.current;
+    if (!img) return;
+    const canvas = document.createElement('canvas');
+    const px = (cropX / 100) * img.naturalWidth;
+    const py = (cropY / 100) * img.naturalHeight;
+    const pw = (cropSize / 100) * img.naturalWidth;
+    const ph = pw; // square output
+    canvas.width = Math.round(pw);
+    canvas.height = Math.round(ph);
+    canvas.getContext('2d')!.drawImage(img, px, py, pw, ph, 0, 0, pw, ph);
+    const preview = canvas.toDataURL('image/jpeg', 0.85);
+    canvas.toBlob(b => { if (b) onCrop(new File([b], 'face.jpg', { type: 'image/jpeg' }), preview); }, 'image/jpeg', 0.85);
+  };
+
+  return (
+    <div className="space-y-3">
+      <p className="text-pink-200 text-sm text-center">גררו את הריבוע על אזור הפנים</p>
+      <div className="relative select-none rounded-xl overflow-hidden" style={{ touchAction: 'none' }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img ref={imgRef} src={src} alt="בחר פנים" className="w-full rounded-xl" draggable={false} />
+        {/* Dark overlay */}
+        <div className="absolute inset-0 bg-black/50 pointer-events-none" />
+        {/* Crop window — clears the overlay */}
+        <div
+          className="absolute border-2 border-white cursor-move"
+          style={{
+            left: `${cropX}%`,
+            top: `${cropY}%`,
+            width: `${cropSize}%`,
+            aspectRatio: '1 / 1',
+            boxShadow: '0 0 0 9999px rgba(0,0,0,0.5)',
+          }}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+        >
+          <div className="absolute -top-1 -left-1 w-3 h-3 bg-white rounded-full" />
+          <div className="absolute -top-1 -right-1 w-3 h-3 bg-white rounded-full" />
+          <div className="absolute -bottom-1 -left-1 w-3 h-3 bg-white rounded-full" />
+          <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-white rounded-full" />
+        </div>
+      </div>
+      <div className="flex items-center justify-center gap-4">
+        <button onClick={() => setCropSize(s => Math.max(15, s - 5))} className="bg-white/20 text-white rounded-xl px-4 py-2 font-bold text-xl">−</button>
+        <span className="text-white/70 text-sm">גודל</span>
+        <button onClick={() => setCropSize(s => Math.min(90, s + 5))} className="bg-white/20 text-white rounded-xl px-4 py-2 font-bold text-xl">+</button>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <button onClick={onSkip} className="bg-white/20 text-white/70 font-bold py-3 rounded-xl">ללא חיתוך</button>
+        <button onClick={handleConfirm} className="bg-green-500 hover:bg-green-600 text-white font-bold py-3 rounded-xl">✓ חתוך ושמור</button>
+      </div>
+    </div>
+  );
 }
 
 function RefinementInput({ disabled, onRefine }: { disabled: boolean; onRefine: (text: string) => void }) {
