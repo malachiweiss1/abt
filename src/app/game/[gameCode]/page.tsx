@@ -6,6 +6,22 @@ import { createClient } from '@/lib/supabase/client';
 import Confetti from '@/components/Confetti';
 import type { Game, Question, Player, Answer } from '@/types';
 
+const TF_ANSWERS = [
+  { question: 'אביה למדה במדרשת נשמת ב2017?', answer: 'כן' },
+  { question: 'אביה גרה בבאר שבע יותר מ5 שנים?', answer: 'לא, בספטמבר 2026 נציין 5 שנים בבאר שבע.' },
+  { question: 'רוב המלוות של אביה נשואות?', answer: 'כן.' },
+  { question: 'אביה תסיים התמחות לפני הבר מצווה של צור?', answer: 'כן בעז"ה' },
+  { question: 'אביה במחזור מ״ח היום בלימודים?', answer: 'לא - מחזור מ"ט.' },
+  { question: 'אביה היא האמא הראשונה במחזור לימודים שלה?', answer: 'כן' },
+  { question: 'אביה הולכת לאימוני כושר 3 פעמים בשבוע?', answer: 'לא - רק פעמיים.' },
+  { question: 'התאריך לידה העברי של אביה זה כ״ז אב תשנ״ח?', answer: 'כן' },
+  { question: 'אביה היום בסבב כירורגיה?', answer: 'כן' },
+  { question: 'אביה עדיין עובדת במכון ריאות בסורוקה?', answer: 'כן' },
+  { question: 'אביה חברה בוועדת קליטה של הקהילה?', answer: 'לא' },
+  { question: 'התאריך לידה הלועזי של אביה הוא 18.9.98?', answer: 'לא, התאריך הוא 19.8.98' },
+  { question: 'גימטריה של אביה = 18?', answer: 'כן' },
+];
+
 const OPEN_IMAGES = [
   '/open_images/IMG_4876.png',
   '/open_images/IMG_4877.png',
@@ -211,7 +227,7 @@ export default function GameScreen({ params }: PageProps) {
     : 0;
   const activeDrawingScored = (activeDrawingAnswer?.base_score ?? 0) > 0;
 
-  let activeGreeting: { playerName: string; text: string; voice: string; predictionId?: string; videoUrl?: string } | null = null;
+  let activeGreeting: { playerName: string; text: string; voice: string; predictionId?: string; videoUrl?: string; score: number; scored: boolean } | null = null;
   if (activeAnswer) {
     let text = activeAnswer.answer_value;
     let voice = 'woman';
@@ -232,6 +248,8 @@ export default function GameScreen({ params }: PageProps) {
       voice,
       predictionId,
       videoUrl,
+      score: Math.round((activeAnswer.base_score ?? 0) / 100),
+      scored: (activeAnswer.base_score ?? 0) > 0,
     };
   }
 
@@ -558,21 +576,21 @@ export default function GameScreen({ params }: PageProps) {
                     <p className="text-pink-200 text-lg">{greetingIndex + 1} / {flatMemes.length}</p>
                     <p className="text-white text-3xl font-bold mt-1">{activeMeme.playerName}</p>
                   </div>
-                  <div className="relative rounded-2xl overflow-hidden w-full max-w-2xl" style={{ maxHeight: '60vh' }}>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={activeMeme.imageUrl} alt="מם" className="w-full object-cover" style={{ maxHeight: '60vh' }} />
-                    {activeMeme.caption && (
-                      <div className="absolute bottom-0 left-0 right-0 bg-black/80 text-white text-center font-bold text-2xl p-3">
-                        {activeMeme.caption}
-                      </div>
-                    )}
-                  </div>
                   {activeMeme.score !== undefined && (
                     <div className="bg-yellow-400/30 border-2 border-yellow-400 rounded-2xl px-8 py-4 text-center">
                       <p className="text-yellow-200 text-lg">ניקוד</p>
                       <p className="text-white text-6xl font-bold">{activeMeme.score}<span className="text-3xl text-yellow-200">/10</span></p>
                     </div>
                   )}
+                  <div className="relative rounded-2xl overflow-hidden w-full max-w-2xl" style={{ maxHeight: '60vh' }}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={activeMeme.imageUrl} alt="מם" className="w-full object-contain" style={{ maxHeight: '60vh' }} />
+                    {activeMeme.caption && (
+                      <div className="absolute bottom-0 left-0 right-0 bg-black/80 text-white text-center font-bold text-2xl p-3">
+                        {activeMeme.caption}
+                      </div>
+                    )}
+                  </div>
                 </>
               )}
             </div>
@@ -594,14 +612,6 @@ export default function GameScreen({ params }: PageProps) {
                     <p className="text-pink-200 text-lg">{greetingIndex + 1} / {sortedDrawingAnswers.length}</p>
                     <p className="text-white text-3xl font-bold mt-1">{activeDrawingPlayerName}</p>
                   </div>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    key={activeDrawingAnswer.id}
-                    src={activeDrawingAnswer.answer_value}
-                    alt="ציור"
-                    className="w-full max-w-lg rounded-2xl object-contain bg-white"
-                    style={{ maxHeight: '50vh' }}
-                  />
                   {activeDrawingScored && (
                     <div className="bg-yellow-400/30 border-2 border-yellow-400 rounded-2xl px-8 py-4 text-center">
                       <p className="text-yellow-200 text-lg">ניקוד</p>
@@ -610,6 +620,14 @@ export default function GameScreen({ params }: PageProps) {
                       </p>
                     </div>
                   )}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    key={activeDrawingAnswer.id}
+                    src={activeDrawingAnswer.answer_value}
+                    alt="ציור"
+                    className="w-full max-w-lg rounded-2xl object-contain bg-white"
+                    style={{ maxHeight: '50vh' }}
+                  />
                 </>
               )}
             </div>
@@ -632,14 +650,6 @@ export default function GameScreen({ params }: PageProps) {
                     <p className="text-pink-200 text-lg">{greetingIndex + 1} / {sortedDrawingAnswers.length}</p>
                     <p className="text-white text-3xl font-bold mt-1">{activeDrawingPlayerName}</p>
                   </div>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    key={activeDrawingAnswer.id}
-                    src={activeDrawingAnswer.answer_value}
-                    alt="תמונת AI"
-                    className="w-full max-w-lg rounded-2xl object-contain bg-white"
-                    style={{ maxHeight: '50vh' }}
-                  />
                   {activeDrawingScored && (
                     <div className="bg-yellow-400/30 border-2 border-yellow-400 rounded-2xl px-8 py-4 text-center">
                       <p className="text-yellow-200 text-lg">ניקוד</p>
@@ -648,6 +658,14 @@ export default function GameScreen({ params }: PageProps) {
                       </p>
                     </div>
                   )}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    key={activeDrawingAnswer.id}
+                    src={activeDrawingAnswer.answer_value}
+                    alt="תמונת AI"
+                    className="w-full max-w-lg rounded-2xl object-contain bg-white"
+                    style={{ maxHeight: '50vh' }}
+                  />
                 </>
               )}
             </div>
@@ -675,6 +693,14 @@ export default function GameScreen({ params }: PageProps) {
                     <p className="text-pink-200 text-lg">{greetingIndex + 1} / {sortedGreetingAnswers.length}</p>
                     <p className="text-white text-3xl font-bold mt-1">{activeGreeting.playerName}</p>
                   </div>
+                  {activeGreeting.scored && (
+                    <div className="bg-yellow-400/30 border-2 border-yellow-400 rounded-2xl px-8 py-4 text-center">
+                      <p className="text-yellow-200 text-lg">ניקוד</p>
+                      <p className="text-white text-6xl font-bold">
+                        {activeGreeting.score}<span className="text-3xl text-yellow-200">/10</span>
+                      </p>
+                    </div>
+                  )}
                   {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
                   <video
                     key={`${activeGreeting.videoUrl}-${greetingIndex}`}
@@ -707,8 +733,28 @@ export default function GameScreen({ params }: PageProps) {
         </div>
       )}
 
+      {/* TF Answers Screen — shown on leaderboard state after TF challenge */}
+      {game.status === 'leaderboard' && isTrueFalseQuestion && (
+        <div className="flex-1 flex flex-col items-center gap-4 w-full max-w-3xl mx-auto overflow-y-auto">
+          <h2 className="text-3xl font-bold text-white text-center">✅ תשובות נכון/לא נכון</h2>
+          <div className="w-full space-y-3">
+            {TF_ANSWERS.map((item, i) => (
+              <div key={i} className="bg-white/20 backdrop-blur-sm rounded-2xl p-4 flex items-center gap-4">
+                <span className={`text-2xl font-bold shrink-0 ${item.answer.startsWith('כן') ? 'text-green-400' : 'text-red-400'}`}>
+                  {item.answer.startsWith('כן') ? '✓' : '✗'}
+                </span>
+                <div className="flex-1 text-right">
+                  <p className="text-white text-lg font-bold">{item.question}</p>
+                  <p className="text-pink-200 text-base">{item.answer}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Leaderboard */}
-      {(game.status === 'leaderboard' || game.status === 'finished') && (
+      {(game.status === 'leaderboard' || game.status === 'finished') && (!isTrueFalseQuestion || game.status === 'finished') && (
         <div className="flex-1 flex flex-col items-center gap-6">
           <h2 className="text-4xl font-bold text-white">
             {game.status === 'finished' ? '🏆 תוצאות סופיות 🏆' : '📊 טבלת מובילים'}
