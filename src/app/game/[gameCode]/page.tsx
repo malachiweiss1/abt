@@ -358,8 +358,6 @@ export default function GameScreen({ params }: PageProps) {
               <div className="bg-white p-3 rounded-xl shadow-lg">
                 {playUrl && <QRCodeSVG value={playUrl} size={170} />}
               </div>
-              <p className="text-white font-bold text-center text-lg">סרקו להצטרפות</p>
-              <p className="text-pink-200 text-xs text-center break-all">{playUrl}</p>
             </div>
           </div>
 
