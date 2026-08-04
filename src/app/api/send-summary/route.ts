@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase/server';
 import nodemailer from 'nodemailer';
 
+export const maxDuration = 60;
+
 const RECIPIENT = 'malachiweiss1@gmail.com';
 const SMTP_USER = 'malachiweiss1@gmail.com';
 const SMTP_PASS = 'refq ghpt hbue movk';

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase/server';
 
+export const maxDuration = 60;
+
 function verifyAdmin(request: NextRequest) {
   const adminPassword = request.headers.get('x-admin-password');
   return adminPassword === process.env.ADMIN_PASSWORD;
@@ -121,11 +123,13 @@ export async function POST(request: NextRequest) {
             .update({ status: 'finished', updated_at: new Date().toISOString() })
             .eq('id', game.id);
           const summaryUrl2 = (process.env.NEXT_PUBLIC_APP_URL || 'https://abt-six.vercel.app') + '/api/send-summary';
-          fetch(summaryUrl2, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ gameCode }),
-          }).catch((e) => console.error('[next_question finish] summary email failed:', e));
+          try {
+            await fetch(summaryUrl2, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ gameCode }),
+            });
+          } catch (e) { console.error('[next_question finish] summary email failed:', e); }
           return NextResponse.json({ success: true, finished: true });
         }
 
@@ -150,13 +154,14 @@ export async function POST(request: NextRequest) {
           .from('games')
           .update({ status: 'finished', updated_at: new Date().toISOString() })
           .eq('id', game.id);
-        // Fire-and-forget: send full game summary email
         const summaryUrl = (process.env.NEXT_PUBLIC_APP_URL || 'https://abt-six.vercel.app') + '/api/send-summary';
-        fetch(summaryUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ gameCode }),
-        }).catch((e) => console.error('[finish_game] summary email failed:', e));
+        try {
+          await fetch(summaryUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ gameCode }),
+          });
+        } catch (e) { console.error('[finish_game] summary email failed:', e); }
         return NextResponse.json({ success: true });
       }
 
