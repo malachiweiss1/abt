@@ -215,6 +215,12 @@ export default function PlayerScreen({ params }: PageProps) {
     return () => { supabase.removeChannel(channel); };
   }, [gameCode, player?.id, loadGame, supabase]);
 
+  // Polling fallback — catches any realtime events the subscription misses
+  useEffect(() => {
+    const id = setInterval(() => loadGame(), 5000);
+    return () => clearInterval(id);
+  }, [loadGame]);
+
   // True/false countdown timer (with 5-second pre-start countdown)
   useEffect(() => {
     if (currentQuestion?.question_type !== 'true_false_rapid') return;
@@ -1057,12 +1063,12 @@ function FaceCrop({ src, onCrop, onSkip }: { src: string; onCrop: (file: File, p
   return (
     <div className="space-y-3">
       <p className="text-pink-200 text-sm text-center">גררו את הריבוע על אזור הפנים</p>
-      <div className="relative select-none rounded-xl overflow-hidden" style={{ touchAction: 'none' }}>
+      <div className="relative select-none rounded-xl overflow-hidden">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img ref={imgRef} src={src} alt="בחר פנים" className="w-full rounded-xl" draggable={false} />
         {/* Dark overlay */}
         <div className="absolute inset-0 bg-black/50 pointer-events-none" />
-        {/* Crop window — clears the overlay */}
+        {/* Crop window — touchAction:none only here so scrolling still works outside */}
         <div
           className="absolute border-2 border-white cursor-move"
           style={{
@@ -1071,6 +1077,7 @@ function FaceCrop({ src, onCrop, onSkip }: { src: string; onCrop: (file: File, p
             width: `${cropSize}%`,
             aspectRatio: '1 / 1',
             boxShadow: '0 0 0 9999px rgba(0,0,0,0.5)',
+            touchAction: 'none',
           }}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}

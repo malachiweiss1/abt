@@ -53,13 +53,19 @@ export default function GameScreen({ params }: PageProps) {
     return () => clearInterval(id);
   }, [game?.status]);
 
-  // Background music during waiting
+  // Music: play during waiting, drawing, AI image, and greeting questions
   useEffect(() => {
-    if (game?.status !== 'waiting') return;
     const audio = audioRef.current;
     if (!audio) return;
-    audio.play().then(() => setMusicBlocked(false)).catch(() => setMusicBlocked(true));
-  }, [game?.status]);
+    const shouldPlay = game?.status === 'waiting'
+      || (game?.status === 'question_active' && (isDrawingQuestion || isImageContestQuestion || isGreetingQuestion));
+    if (shouldPlay) {
+      audio.play().then(() => setMusicBlocked(false)).catch(() => setMusicBlocked(true));
+    } else {
+      audio.pause();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [game?.status, isDrawingQuestion, isImageContestQuestion, isGreetingQuestion]);
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || origin;
   const playUrl = `${appUrl}/play/${gameCode}`;
@@ -300,56 +306,73 @@ export default function GameScreen({ params }: PageProps) {
     <div className="min-h-screen p-6 flex flex-col" dir="rtl">
       {game.status === 'finished' && <Confetti />}
 
-      {/* Header */}
-      <div className="text-center mb-6">
-        <h1 className="text-5xl font-bold text-white mb-2">🎂 כמה אתם מכירים את אביה? 🎂</h1>
-      </div>
+      {/* Background music — always in DOM, controlled via useEffect */}
+      {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+      <audio ref={audioRef} src="/music_for_open.mp3" loop />
+      {musicBlocked && (
+        <button
+          onClick={() => { audioRef.current?.play(); setMusicBlocked(false); }}
+          className="fixed top-4 left-4 z-50 bg-white/20 hover:bg-white/40 text-white rounded-xl px-4 py-2 text-sm font-bold backdrop-blur-sm"
+        >
+          ▶ הפעל מוזיקה
+        </button>
+      )}
 
-      {/* Waiting State */}
+      {/* Header — only when not waiting */}
+      {game.status !== 'waiting' && (
+        <div className="text-center mb-6">
+          <h1 className="text-5xl font-bold text-white mb-2">🎂 כמה אתם מכירים את אביה? 🎂</h1>
+        </div>
+      )}
+
+      {/* Waiting State — full redesign with images in foreground */}
       {game.status === 'waiting' && (
-        <div className="flex-1 flex gap-8 items-center justify-center relative overflow-hidden">
-          {/* Background slideshow */}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            key={slideIdx}
-            src={OPEN_IMAGES[slideIdx]}
-            alt=""
-            className="absolute inset-0 w-full h-full object-cover opacity-40 transition-opacity duration-1000"
-          />
-          {/* Background music */}
-          {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-          <audio ref={audioRef} src="/music_for_open.mp3" loop />
-          {musicBlocked && (
-            <button
-              onClick={() => { audioRef.current?.play(); setMusicBlocked(false); }}
-              className="absolute top-4 left-4 z-20 bg-white/20 hover:bg-white/40 text-white rounded-xl px-4 py-2 text-sm font-bold backdrop-blur-sm"
-            >
-              ▶ הפעל מוזיקה
-            </button>
-          )}
-          {/* Content */}
-          <div className="relative z-10 flex gap-8 items-center justify-center w-full">
-            <div className="flex flex-col items-center gap-6">
-              <div className="bg-white p-4 rounded-2xl shadow-2xl">
-                {playUrl && <QRCodeSVG value={playUrl} size={200} />}
-              </div>
-              <p className="text-white text-lg text-center">סרקו להצטרפות</p>
-              <p className="text-pink-200 text-sm">{playUrl}</p>
+        <div className="flex-1 flex gap-6 items-stretch min-h-0">
+          {/* Left: Slideshow images — prominent, full opacity */}
+          <div className="flex-1 relative rounded-3xl overflow-hidden shadow-2xl">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              key={slideIdx}
+              src={OPEN_IMAGES[slideIdx]}
+              alt=""
+              className="w-full h-full object-cover"
+              style={{ transition: 'opacity 0.8s ease' }}
+            />
+            {/* Slide indicators */}
+            <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-2">
+              {OPEN_IMAGES.map((_, i) => (
+                <div key={i} className={`h-2 rounded-full transition-all duration-500 ${i === slideIdx ? 'w-6 bg-white' : 'w-2 bg-white/50'}`} />
+              ))}
             </div>
-            <div className="flex flex-col gap-4">
-              <h2 className="text-white text-3xl font-bold text-center">
+            {/* Title overlay */}
+            <div className="absolute top-0 left-0 right-0 p-6 bg-gradient-to-b from-black/60 to-transparent">
+              <h1 className="text-4xl font-bold text-white text-center drop-shadow-lg">🎂 כמה אתם מכירים את אביה? 🎂</h1>
+            </div>
+          </div>
+
+          {/* Right: QR + players */}
+          <div className="w-72 flex flex-col gap-4">
+            <div className="bg-white/15 backdrop-blur-sm rounded-2xl p-4 flex flex-col items-center gap-3 shadow-xl">
+              <div className="bg-white p-3 rounded-xl shadow-lg">
+                {playUrl && <QRCodeSVG value={playUrl} size={170} />}
+              </div>
+              <p className="text-white font-bold text-center">סרקו להצטרפות</p>
+              <p className="text-pink-200 text-xs text-center break-all">{playUrl}</p>
+            </div>
+            <div className="flex-1 bg-white/10 backdrop-blur-sm rounded-2xl p-4 min-h-0 flex flex-col shadow-xl">
+              <h2 className="text-white text-xl font-bold text-center mb-3">
                 שחקנים מחוברים ({players.length})
               </h2>
-              <div className="grid grid-cols-2 gap-3 max-h-96 overflow-y-auto">
+              <div className="flex-1 overflow-y-auto space-y-2 min-h-0">
                 {players.map(p => (
-                  <div key={p.id} className="bg-white/20 rounded-xl px-4 py-2 text-white text-xl text-center backdrop-blur-sm">
+                  <div key={p.id} className="bg-white/20 rounded-xl px-3 py-2 text-white text-lg text-center backdrop-blur-sm">
                     {p.display_name}
                   </div>
                 ))}
+                {players.length === 0 && (
+                  <p className="text-pink-200 text-lg text-center mt-4">ממתין לשחקנים...</p>
+                )}
               </div>
-              {players.length === 0 && (
-                <p className="text-pink-200 text-xl text-center">ממתין לשחקנים...</p>
-              )}
             </div>
           </div>
         </div>
@@ -652,7 +675,7 @@ export default function GameScreen({ params }: PageProps) {
                   </div>
                   {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
                   <video
-                    key={activeGreeting.videoUrl}
+                    key={`${activeGreeting.videoUrl}-${greetingIndex}`}
                     src={activeGreeting.videoUrl}
                     autoPlay
                     playsInline
