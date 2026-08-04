@@ -533,10 +533,26 @@ export default function GameScreen({ params }: PageProps) {
       {game.status === 'answer_revealed' && currentQuestion && (
         <div className="flex-1 flex flex-col items-center gap-6 w-full max-w-3xl mx-auto">
           {isTrueFalseQuestion ? (
-            // Show leaderboard-style breakdown
-            <div className="flex-1 flex flex-col w-full gap-4">
-              <h2 className="text-3xl font-bold text-white text-center">✅ תוצאות נכון/לא נכון</h2>
-              <div className="w-full space-y-3 max-h-[70vh] overflow-y-auto">
+            // Show TF answers + player scores
+            <div className="flex-1 flex flex-col w-full gap-4 overflow-y-auto">
+              <h2 className="text-3xl font-bold text-white text-center">✅ תשובות נכון/לא נכון</h2>
+              {/* Correct answers for each statement */}
+              <div className="w-full space-y-2">
+                {TF_ANSWERS.map((item, i) => (
+                  <div key={i} className="bg-white/20 backdrop-blur-sm rounded-xl p-3 flex items-center gap-3">
+                    <span className={`text-xl font-bold shrink-0 ${item.answer.startsWith('כן') ? 'text-green-400' : 'text-red-400'}`}>
+                      {item.answer.startsWith('כן') ? '✓' : '✗'}
+                    </span>
+                    <div className="flex-1 text-right">
+                      <p className="text-white text-base font-bold">{item.question}</p>
+                      <p className="text-pink-200 text-sm">{item.answer}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {/* Player scores */}
+              <h3 className="text-xl font-bold text-white text-center mt-2">ניקוד שחקנים</h3>
+              <div className="w-full space-y-2">
                 {players.map((p, i) => {
                   const pAnswer = answers.find(a => a.player_id === p.id);
                   let correct = 0, total = 0;
@@ -548,11 +564,11 @@ export default function GameScreen({ params }: PageProps) {
                     } catch { /* ignore */ }
                   }
                   return (
-                    <div key={p.id} className={`flex items-center gap-4 rounded-2xl p-4 ${i === 0 ? 'bg-yellow-400/40 border border-yellow-400' : 'bg-white/20'}`}>
-                      <span className="text-2xl font-bold text-white w-8">{i + 1}.</span>
-                      <span className="text-xl text-white flex-1">{p.display_name}</span>
+                    <div key={p.id} className={`flex items-center gap-4 rounded-2xl p-3 ${i === 0 ? 'bg-yellow-400/40 border border-yellow-400' : 'bg-white/20'}`}>
+                      <span className="text-xl font-bold text-white w-8">{i + 1}.</span>
+                      <span className="text-lg text-white flex-1">{p.display_name}</span>
                       <span className="text-green-300 font-bold">{correct}/{total}</span>
-                      <span className="text-yellow-300 font-bold text-xl">{pAnswer ? correct * 100 : 0}</span>
+                      <span className="text-yellow-300 font-bold text-lg">{pAnswer ? correct * 100 : 0}</span>
                     </div>
                   );
                 })}
@@ -733,28 +749,8 @@ export default function GameScreen({ params }: PageProps) {
         </div>
       )}
 
-      {/* TF Answers Screen — shown on leaderboard state after TF challenge */}
-      {game.status === 'leaderboard' && isTrueFalseQuestion && (
-        <div className="flex-1 flex flex-col items-center gap-4 w-full max-w-3xl mx-auto overflow-y-auto">
-          <h2 className="text-3xl font-bold text-white text-center">✅ תשובות נכון/לא נכון</h2>
-          <div className="w-full space-y-3">
-            {TF_ANSWERS.map((item, i) => (
-              <div key={i} className="bg-white/20 backdrop-blur-sm rounded-2xl p-4 flex items-center gap-4">
-                <span className={`text-2xl font-bold shrink-0 ${item.answer.startsWith('כן') ? 'text-green-400' : 'text-red-400'}`}>
-                  {item.answer.startsWith('כן') ? '✓' : '✗'}
-                </span>
-                <div className="flex-1 text-right">
-                  <p className="text-white text-lg font-bold">{item.question}</p>
-                  <p className="text-pink-200 text-base">{item.answer}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* Leaderboard */}
-      {(game.status === 'leaderboard' || game.status === 'finished') && (!isTrueFalseQuestion || game.status === 'finished') && (
+      {(game.status === 'leaderboard' || game.status === 'finished') && (
         <div className="flex-1 flex flex-col items-center gap-6">
           <h2 className="text-4xl font-bold text-white">
             {game.status === 'finished' ? '🏆 תוצאות סופיות 🏆' : '📊 טבלת מובילים'}
