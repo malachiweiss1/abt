@@ -53,6 +53,11 @@ export default function GameScreen({ params }: PageProps) {
     return () => clearInterval(id);
   }, [game?.status]);
 
+  // Derived question type booleans (declared early so music useEffect can reference them)
+  const isGreetingQuestion = currentQuestion?.question_type === 'free_text_greeting';
+  const isDrawingQuestion = currentQuestion?.question_type === 'drawing_contest';
+  const isImageContestQuestion = currentQuestion?.question_type === 'ai_image_contest';
+
   // Music: play during waiting, drawing, AI image, and greeting questions
   useEffect(() => {
     const audio = audioRef.current;
@@ -164,10 +169,7 @@ export default function GameScreen({ params }: PageProps) {
     return () => clearInterval(id);
   }, [currentQuestion?.question_type, game?.status, game?.question_started_at]);
 
-  // Compute active greeting state (needed before polling useEffect so deps are in scope)
-  const isGreetingQuestion = currentQuestion?.question_type === 'free_text_greeting';
-  const isDrawingQuestion = currentQuestion?.question_type === 'drawing_contest';
-  const isImageContestQuestion = currentQuestion?.question_type === 'ai_image_contest';
+  // Compute remaining question type booleans
   const isTrueFalseQuestion = currentQuestion?.question_type === 'true_false_rapid';
   const isMemeQuestion = currentQuestion?.question_type === 'meme_contest';
   const isVideoQuestion = currentQuestion?.question_type === 'video_question';
