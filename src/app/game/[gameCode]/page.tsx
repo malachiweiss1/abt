@@ -329,17 +329,20 @@ export default function GameScreen({ params }: PageProps) {
 
       {/* Waiting State */}
       {game.status === 'waiting' && (
-        <div className="flex-1 flex flex-col gap-4 min-h-0">
+        <div className="flex-1 flex flex-col gap-3 min-h-0">
+          {/* Title above everything */}
+          <h1 className="text-4xl font-bold text-white text-center drop-shadow-lg shrink-0">🎂 כמה אתם מכירים את אביה? 🎂</h1>
+
           {/* Top row: slideshow image + QR at the same height */}
           <div className="flex gap-6 min-h-0" style={{ flex: '1 1 0' }}>
-            {/* Slideshow image */}
-            <div className="flex-1 relative rounded-3xl overflow-hidden shadow-2xl min-h-0">
+            {/* Slideshow image — object-contain so full image is always visible */}
+            <div className="flex-1 relative rounded-3xl overflow-hidden shadow-2xl min-h-0 bg-black/20">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 key={slideIdx}
                 src={OPEN_IMAGES[slideIdx]}
                 alt=""
-                className="w-full h-full object-cover"
+                className="w-full h-full object-contain"
                 style={{ transition: 'opacity 0.8s ease' }}
               />
               {/* Slide indicators */}
@@ -347,10 +350,6 @@ export default function GameScreen({ params }: PageProps) {
                 {OPEN_IMAGES.map((_, i) => (
                   <div key={i} className={`h-2 rounded-full transition-all duration-500 ${i === slideIdx ? 'w-6 bg-white' : 'w-2 bg-white/50'}`} />
                 ))}
-              </div>
-              {/* Title overlay */}
-              <div className="absolute top-0 left-0 right-0 p-6 bg-gradient-to-b from-black/60 to-transparent">
-                <h1 className="text-4xl font-bold text-white text-center drop-shadow-lg">🎂 כמה אתם מכירים את אביה? 🎂</h1>
               </div>
             </div>
 
