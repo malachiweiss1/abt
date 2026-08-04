@@ -305,7 +305,7 @@ export default function GameScreen({ params }: PageProps) {
   const incorrectAnswers = answers.filter(a => !a.is_correct).length;
 
   return (
-    <div className="min-h-screen p-6 flex flex-col" dir="rtl">
+    <div className="h-screen overflow-hidden p-6 flex flex-col" dir="rtl">
       {game.status === 'finished' && <Confetti />}
 
       {/* Background music — always in DOM, controlled via useEffect */}
