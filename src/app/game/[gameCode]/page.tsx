@@ -327,54 +327,57 @@ export default function GameScreen({ params }: PageProps) {
         </div>
       )}
 
-      {/* Waiting State — full redesign with images in foreground */}
+      {/* Waiting State */}
       {game.status === 'waiting' && (
-        <div className="flex-1 flex gap-6 items-stretch min-h-0">
-          {/* Left: Slideshow images — prominent, full opacity */}
-          <div className="flex-1 relative rounded-3xl overflow-hidden shadow-2xl">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              key={slideIdx}
-              src={OPEN_IMAGES[slideIdx]}
-              alt=""
-              className="w-full h-full object-cover"
-              style={{ transition: 'opacity 0.8s ease' }}
-            />
-            {/* Slide indicators */}
-            <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-2">
-              {OPEN_IMAGES.map((_, i) => (
-                <div key={i} className={`h-2 rounded-full transition-all duration-500 ${i === slideIdx ? 'w-6 bg-white' : 'w-2 bg-white/50'}`} />
-              ))}
+        <div className="flex-1 flex flex-col gap-4 min-h-0">
+          {/* Top row: slideshow image + QR at the same height */}
+          <div className="flex gap-6 min-h-0" style={{ flex: '1 1 0' }}>
+            {/* Slideshow image */}
+            <div className="flex-1 relative rounded-3xl overflow-hidden shadow-2xl min-h-0">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                key={slideIdx}
+                src={OPEN_IMAGES[slideIdx]}
+                alt=""
+                className="w-full h-full object-cover"
+                style={{ transition: 'opacity 0.8s ease' }}
+              />
+              {/* Slide indicators */}
+              <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-2">
+                {OPEN_IMAGES.map((_, i) => (
+                  <div key={i} className={`h-2 rounded-full transition-all duration-500 ${i === slideIdx ? 'w-6 bg-white' : 'w-2 bg-white/50'}`} />
+                ))}
+              </div>
+              {/* Title overlay */}
+              <div className="absolute top-0 left-0 right-0 p-6 bg-gradient-to-b from-black/60 to-transparent">
+                <h1 className="text-4xl font-bold text-white text-center drop-shadow-lg">🎂 כמה אתם מכירים את אביה? 🎂</h1>
+              </div>
             </div>
-            {/* Title overlay */}
-            <div className="absolute top-0 left-0 right-0 p-6 bg-gradient-to-b from-black/60 to-transparent">
-              <h1 className="text-4xl font-bold text-white text-center drop-shadow-lg">🎂 כמה אתם מכירים את אביה? 🎂</h1>
-            </div>
-          </div>
 
-          {/* Right: QR + players */}
-          <div className="w-72 flex flex-col gap-4">
-            <div className="bg-white/15 backdrop-blur-sm rounded-2xl p-4 flex flex-col items-center gap-3 shadow-xl">
+            {/* QR card — same height as image */}
+            <div className="w-64 flex flex-col items-center justify-center bg-white/15 backdrop-blur-sm rounded-2xl p-5 shadow-xl gap-3">
               <div className="bg-white p-3 rounded-xl shadow-lg">
                 {playUrl && <QRCodeSVG value={playUrl} size={170} />}
               </div>
-              <p className="text-white font-bold text-center">סרקו להצטרפות</p>
+              <p className="text-white font-bold text-center text-lg">סרקו להצטרפות</p>
               <p className="text-pink-200 text-xs text-center break-all">{playUrl}</p>
             </div>
-            <div className="flex-1 bg-white/10 backdrop-blur-sm rounded-2xl p-4 min-h-0 flex flex-col shadow-xl">
-              <h2 className="text-white text-xl font-bold text-center mb-3">
-                שחקנים מחוברים ({players.length})
-              </h2>
-              <div className="flex-1 overflow-y-auto space-y-2 min-h-0">
-                {players.map(p => (
-                  <div key={p.id} className="bg-white/20 rounded-xl px-3 py-2 text-white text-lg text-center backdrop-blur-sm">
-                    {p.display_name}
-                  </div>
-                ))}
-                {players.length === 0 && (
-                  <p className="text-pink-200 text-lg text-center mt-4">ממתין לשחקנים...</p>
-                )}
-              </div>
+          </div>
+
+          {/* Bottom row: connected players across full width */}
+          <div className="bg-white/10 backdrop-blur-sm rounded-2xl px-5 py-3 shadow-xl">
+            <h2 className="text-white text-lg font-bold text-center mb-2">
+              שחקנים מחוברים ({players.length})
+            </h2>
+            <div className="flex flex-wrap gap-2 justify-center">
+              {players.map(p => (
+                <div key={p.id} className="bg-white/20 rounded-xl px-4 py-2 text-white text-lg font-medium backdrop-blur-sm">
+                  {p.display_name}
+                </div>
+              ))}
+              {players.length === 0 && (
+                <p className="text-pink-200 text-base text-center py-1">ממתין לשחקנים...</p>
+              )}
             </div>
           </div>
         </div>
