@@ -602,7 +602,7 @@ export default function AdminScreen({ params }: PageProps) {
 
             {/* Scoring for current video */}
             {greetingIndex >= 0 && greetingAnswers[greetingIndex] && (() => {
-              const currentGreetingAnswer = answers[greetingIndex];
+              const currentGreetingAnswer = answers.find(a => a.id === greetingAnswers[greetingIndex].id) ?? null;
               const alreadyScored = currentGreetingAnswer && (currentGreetingAnswer.base_score ?? 0) > 0;
               const scoredValue = alreadyScored ? Math.round((currentGreetingAnswer.base_score ?? 0) / 100) : null;
               return (
